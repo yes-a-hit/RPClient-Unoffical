@@ -1,10 +1,10 @@
 package me.kafuuneko.rpclient.libs.llm.model
 
-/** 新模型配置为模型回复预留的默认 Token 数。 */
-const val DEFAULT_LLM_MAX_TOKENS = 8192
+/** 新模型配置为模型回复预留的默认 Token 数，按十进制 8K 计数。 */
+const val DEFAULT_LLM_MAX_TOKENS = 8_000
 
-/** 新模型配置用于输入与输出的默认总上下文预算。 */
-const val DEFAULT_LLM_CONTEXT_TOKENS = 32768
+/** 新模型配置用于输入与输出的默认总上下文预算，按十进制 32K 计数。 */
+const val DEFAULT_LLM_CONTEXT_TOKENS = 32_000
 
 /** 高级请求 JSON 中用于引用稳定匿名会话路由 ID 的系统变量名。 */
 const val LLM_REQUEST_VARIABLE_ROUTING_SESSION_ID = "\$rpclient.routing_session_id"
