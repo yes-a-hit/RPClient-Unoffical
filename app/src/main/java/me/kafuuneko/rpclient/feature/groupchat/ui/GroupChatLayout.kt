@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Image as ImageIcon
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -117,6 +118,7 @@ import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.media.MessageImageState
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatGenerationState
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatMemberItem
+import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatSceneItem
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatMessageItem
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatConversationState
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatDialogState
@@ -281,6 +283,12 @@ private fun GroupChatNormalView(
                 canContinue = canContinue,
                 hasAvailableProvider = state.hasAvailableProvider,
                 onContinue = { emitIntent(GroupChatUiIntent.ContinueLast) }
+            )
+            SceneRail(
+                scenes = state.scenes,
+                activeSceneId = state.activeSceneId,
+                enabled = !generating,
+                onSelect = { emitIntent(GroupChatUiIntent.SwitchScene(it)) }
             )
             MemberRail(
                 members = state.members,
@@ -1067,6 +1075,63 @@ private fun GroupHeader(
                     Text(stringResource(R.string.continue_latest_reply))
                 }
             }
+        }
+    }
+}
+
+/**
+ * 场景标签行。
+ *
+ * 只在配过场景的群聊里出现。第一个「全员」是回到不限制的状态——
+ * 少了它，切进某个场景之后就再也出不来。
+ */
+@Composable
+private fun SceneRail(
+    scenes: List<GroupChatSceneItem>,
+    activeSceneId: String,
+    enabled: Boolean,
+    onSelect: (String?) -> Unit
+) {
+    if (scenes.isEmpty()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 14.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FilterChip(
+            selected = activeSceneId.isBlank(),
+            enabled = enabled,
+            onClick = { onSelect(null) },
+            label = { Text(stringResource(R.string.group_chat_scene_all)) },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.Groups,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        )
+        scenes.forEach { scene ->
+            FilterChip(
+                selected = scene.id == activeSceneId,
+                enabled = enabled,
+                onClick = { onSelect(scene.id) },
+                label = { Text(scene.name) },
+                leadingIcon = if (scene.restrictMembers) {
+                    {
+                        Icon(
+                            Icons.Rounded.Place,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                } else {
+                    null
+                }
+            )
         }
     }
 }

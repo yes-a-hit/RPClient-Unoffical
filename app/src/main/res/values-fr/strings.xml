@@ -1511,4 +1511,8 @@
     <string name="backup_and_restore_desc">Exporter tout ou importer apres reinstallation</string>
     <string name="backup_include_secrets">Inclure les cles</string>
     <string name="backup_include_secrets_hint">Desactive : cles vides, reste complet</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>

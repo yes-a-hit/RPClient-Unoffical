@@ -1505,4 +1505,8 @@
     <string name="backup_and_restore_desc">匯出全部資料，或在重裝後匯入</string>
     <string name="backup_include_secrets">包含 API 金鑰</string>
     <string name="backup_include_secrets_hint">關閉時匯出檔金鑰留空，其餘完整</string>
+    <string name="group_chat_scene_switched">已切換到「%1$s」</string>
+    <string name="group_chat_scene_cleared">已離開場景，全體成員重新在場</string>
+    <string name="group_chat_scene_not_found">沒有名為「%1$s」的場景</string>
+    <string name="group_chat_scene_all">全員</string>
 </resources>

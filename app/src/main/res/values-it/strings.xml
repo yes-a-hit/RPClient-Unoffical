@@ -1489,4 +1489,8 @@ Apri le impostazioni del modello per verificare la chiave API, l\'URL di base, i
     <string name="backup_and_restore_desc">Esporta tutto o importa dopo reinstallazione</string>
     <string name="backup_include_secrets">Includi chiavi</string>
     <string name="backup_include_secrets_hint">Spento: chiavi vuote, resto completo</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>

@@ -3,6 +3,7 @@ package me.kafuuneko.rpclient.libs.groupchat
 import com.google.gson.Gson
 import me.kafuuneko.rpclient.libs.character.CharacterProfileCodec
 import me.kafuuneko.rpclient.libs.AppModel
+import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatScene
 import me.kafuuneko.rpclient.libs.llm.model.LLMGenerationOptions
 import me.kafuuneko.rpclient.libs.llm.model.LLMGenerationRequest
 import me.kafuuneko.rpclient.libs.llm.model.LLMImageReference
@@ -513,10 +514,14 @@ class GroupChatPromptBuilder(
             mProfileCodec.toPromptFragment(mProfileCodec.extract(it.extensionsJson))
         }
         val personality = context.combineCharacterField(members) { it.personality }
-        val scenario = context.session.scenario
+        val baseScenario = context.session.scenario
             .takeIf { it.isNotBlank() }
             ?.resolve(context, context.memberNames())
             ?: context.combineCharacterField(members) { it.scenario }
+        val scenario = context.sceneSection()?.let { section ->
+            // 场景段放在最前面：模型先知道「现在在哪、谁在场」，再读角色设定才判断得对谁该开口
+            if (baseScenario.isBlank()) section else section + "\n" + baseScenario
+        } ?: baseScenario
 
         return buildList {
             description.takeIf { it.isNotBlank() }?.let {
@@ -781,16 +786,64 @@ class GroupChatPromptBuilder(
 
     /** 根据角色卡模式和静音设置确定本轮注入的成员卡。 */
     private fun GroupChatPromptContext.cardMembers(): List<GroupChatMemberData> {
+        // 先按场景裁掉不在场的人，再走原有的静音与 Swap 规则：
+        // 顺序反过来会把「不在场」的人当成静音成员带进来
+        val present = presentMembers()
         if (session.characterCardMode == GroupChatSession.CharacterCardMode.Swap) {
-            return members.filter { it.character.id == speaker.id }
+            return present.filter { it.character.id == speaker.id }
         }
         return if (session.includeMutedCards) {
-            members
+            present
         } else {
-            members.filter {
+            present.filter {
                 !it.relation.muted || it.character.id == speaker.id
             }
         }
+    }
+
+    /**
+     * 当前场景，未设置或已失效时返回 null。
+     */
+    private fun GroupChatPromptContext.activeScene(): GroupChatScene? =
+        GroupChatScenes.active(GroupChatScenes.decode(session.scenesJson), session.activeSceneId)
+
+    /**
+     * 本场实际在场的成员。
+     *
+     * 场景没限定成员时原样返回全体，这样没配过场景的群聊行为完全不变。
+     */
+    private fun GroupChatPromptContext.presentMembers(): List<GroupChatMemberData> {
+        val allowed = GroupChatScenes.allowedCharacterIds(activeScene()) ?: return members
+        return members.filter { it.character.id in allowed }
+    }
+
+    /**
+     * 渲染场景段落。
+     *
+     * 只有配了场景才出现。段落里明确写「只有这些人在场」——
+     * 不写的话模型会顺手把不在场的成员也拉进对话，
+     * 场景就白分了。
+     */
+    private fun GroupChatPromptContext.sceneSection(): String? {
+        val scene = activeScene() ?: return null
+        val builder = StringBuilder()
+        builder.append("【当前场景】").append(scene.name)
+        if (scene.description.isNotBlank()) {
+            builder.append('\n').append(scene.description.trim())
+        }
+        if (scene.restrictsMembers) {
+            val presentNames = presentMembers().joinToString("、") { it.character.name }
+            if (presentNames.isNotBlank()) {
+                builder.append("\n【本场在场】").append(presentNames)
+                builder.append("\n只有在场角色可以发言和行动，其余成员此时不在这一场，不得替他们说话或描写他们的反应。")
+            } else {
+                builder.append("\n【本场无人】配置的在场角色都不在群成员里，本场只能描写环境。")
+            }
+        }
+        if (scene.entryPrompt.isNotBlank()) {
+            builder.append('\n').append(scene.entryPrompt.trim())
+        }
+        return builder.toString()
     }
 
     /** 格式化群聊成员姓名逗号分隔字符串。 */

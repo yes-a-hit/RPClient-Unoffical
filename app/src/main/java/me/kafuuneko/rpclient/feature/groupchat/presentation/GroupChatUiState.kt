@@ -4,6 +4,7 @@ import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatGenerationState
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatAvailableCharacterItem
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatMemberItem
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatMessageItem
+import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatSceneItem
 import me.kafuuneko.rpclient.libs.media.MessageImageState
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatActivationStrategy
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatCharacterCardMode
@@ -48,7 +49,11 @@ sealed class GroupChatUiState {
         /** 当前页面互斥展示的对话框状态。 */
         val dialogState: GroupChatDialogState = GroupChatDialogState.None,
         /** 聊天页背景配置，与单聊共用同一份全局背景设置。 */
-        val backgroundState: ChatBackgroundUiState = ChatBackgroundUiState()
+        val backgroundState: ChatBackgroundUiState = ChatBackgroundUiState(),
+        /** 当前会话可切换的场景列表；空表示这个群没配场景。 */
+        val scenes: List<GroupChatSceneItem> = emptyList(),
+        /** 当前生效的场景 ID；空表示不限场景，全员在场。 */
+        val activeSceneId: String = ""
     ) : GroupChatUiState()
 
     data class Finished(val previous: GroupChatUiState) : GroupChatUiState()

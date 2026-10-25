@@ -1505,4 +1505,8 @@
     <string name="backup_and_restore_desc">전체 내보내기 또는 재설치 후 가져오기</string>
     <string name="backup_include_secrets">API 키 포함</string>
     <string name="backup_include_secrets_hint">끄면 키는 비고 나머지는 유지</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>

@@ -1506,4 +1506,8 @@
     <string name="backup_and_restore_desc">すべて書き出す／再インストール後に読み込む</string>
     <string name="backup_include_secrets">APIキーを含める</string>
     <string name="backup_include_secrets_hint">オフならキーは空、他は完全</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>

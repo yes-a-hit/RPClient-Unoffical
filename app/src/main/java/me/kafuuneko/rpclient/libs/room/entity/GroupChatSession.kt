@@ -1,5 +1,6 @@
 package me.kafuuneko.rpclient.libs.room.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -50,7 +51,15 @@ data class GroupChatSession(
     // 是否从单个角色的输出中裁剪其他成员的发言前缀。
     val trimOtherSpeakers: Boolean = true,
     // 是否仅暂停当前群聊的自动总结；手动总结不受影响。
-    val autoSummaryPaused: Boolean = false
+    val autoSummaryPaused: Boolean = false,
+    // 群聊内可切换的场景列表，按 JSON 数组保存。
+    // 场景决定「现在有哪些人在场」，与成员表分开：成员是全员，场景是在场子集。
+    // defaultValue 是 SQL 字面量，字符串要带单引号，否则 AutoMigration 建表会失败
+    @ColumnInfo(defaultValue = "'[]'")
+    val scenesJson: String = "[]",
+    // 当前生效的场景 ID；为空表示不限场景，全员在场。
+    @ColumnInfo(defaultValue = "''")
+    val activeSceneId: String = ""
 ) {
     /** 本轮发言者选择策略。 */
     enum class ActivationStrategy {

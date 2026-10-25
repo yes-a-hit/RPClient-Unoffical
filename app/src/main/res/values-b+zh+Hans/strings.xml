@@ -1503,4 +1503,8 @@
     <string name="backup_and_restore_desc">导出全部资料，或在重装后导入</string>
     <string name="backup_include_secrets">包含 API 密钥</string>
     <string name="backup_include_secrets_hint">关闭时导出包里密钥置空，其余资料完整</string>
+    <string name="group_chat_scene_switched">已切换到「%1$s」</string>
+    <string name="group_chat_scene_cleared">已离开场景，全体成员重新在场</string>
+    <string name="group_chat_scene_not_found">没有名为「%1$s」的场景</string>
+    <string name="group_chat_scene_all">全员</string>
 </resources>

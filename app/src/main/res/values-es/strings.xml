@@ -1512,4 +1512,8 @@
     <string name="backup_and_restore_desc">Exporta todo o importa tras reinstalar</string>
     <string name="backup_include_secrets">Incluir claves</string>
     <string name="backup_include_secrets_hint">Apagado: claves vacias, resto completo</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>

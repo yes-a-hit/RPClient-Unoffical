@@ -1511,4 +1511,8 @@ Buka Pengaturan Model untuk memeriksa kunci API, URL dasar, nama model, dan izin
     <string name="backup_and_restore_desc">Ekspor semua atau impor setelah pasang ulang</string>
     <string name="backup_include_secrets">Sertakan kunci</string>
     <string name="backup_include_secrets_hint">Mati: kunci kosong, sisanya lengkap</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>

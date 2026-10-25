@@ -1510,4 +1510,8 @@
     <string name="backup_and_restore_desc">Alles exportieren oder nach Neuinstallation importieren</string>
     <string name="backup_include_secrets">API-Schluessel</string>
     <string name="backup_include_secrets_hint">Aus: Schluessel leer, Rest komplett</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>

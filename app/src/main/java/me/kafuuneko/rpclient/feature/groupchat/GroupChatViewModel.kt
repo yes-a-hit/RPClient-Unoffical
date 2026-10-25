@@ -31,6 +31,7 @@ import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatAvailableCharacter
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatGenerationState
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatMemberItem
 import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatMessageItem
+import me.kafuuneko.rpclient.feature.groupchat.model.GroupChatSceneItem
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatConversationState
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatDialogState
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatLoadState
@@ -88,6 +89,8 @@ import me.kafuuneko.rpclient.libs.regex.RegexScriptRepository
 import me.kafuuneko.rpclient.libs.regex.RegexScriptRuntime
 import me.kafuuneko.rpclient.libs.regex.ScopedRegexScript
 import me.kafuuneko.rpclient.libs.room.entity.GroupChatMessage
+import me.kafuuneko.rpclient.libs.groupchat.GroupChatScenes
+import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatSceneCommand
 import me.kafuuneko.rpclient.libs.room.entity.GroupChatSession
 import me.kafuuneko.rpclient.libs.room.entity.LLMProvider
 import me.kafuuneko.rpclient.libs.room.entity.Lorebook
@@ -560,6 +563,85 @@ class GroupChatViewModel :
      *
      * @param intent 包含目标角色 ID 的意图
      */
+    /**
+     * 按当前场景裁出在场成员。
+     *
+     * 场景没限定成员时原样返回，没配过场景的群聊行为完全不变。
+     */
+    private fun sceneMembersOf(
+        session: GroupChatSession,
+        members: List<GroupChatMemberData>
+    ): List<GroupChatMemberData> {
+        val scenes = GroupChatScenes.decode(session.scenesJson)
+        val allowed = GroupChatScenes.allowedCharacterIds(
+            GroupChatScenes.active(scenes, session.activeSceneId)
+        ) ?: return members
+        return members.filter { it.character.id in allowed }
+    }
+
+    /**
+     * 执行一条场景指令。
+     *
+     * 只改会话的 activeSceneId，不写消息记录：场景切换是「视野」变化，
+     * 不是对话内容，塞进历史会污染上下文。
+     */
+    private suspend fun applySceneCommand(
+        sessionId: Long,
+        command: GroupChatSceneCommand
+    ) {
+        val session = withContext(Dispatchers.IO) {
+            mGroupChatRepository.getGroupChatData(sessionId)?.session
+        } ?: return
+        when (command) {
+            GroupChatSceneCommand.Clear -> {
+                withContext(Dispatchers.IO) {
+                    mGroupChatRepository.updateSession(session.copy(activeSceneId = ""))
+                }
+                AppViewEvent.PopupToastMessage(
+                    mContext.getString(R.string.group_chat_scene_cleared)
+                ).tryEmit()
+            }
+
+            is GroupChatSceneCommand.SwitchTo -> {
+                val scenes = GroupChatScenes.decode(session.scenesJson)
+                val scene = GroupChatScenes.findByName(scenes, command.sceneName)
+                if (scene == null) {
+                    AppViewEvent.PopupToastMessage(
+                        mContext.getString(R.string.group_chat_scene_not_found, command.sceneName)
+                    ).tryEmit()
+                    return
+                }
+                withContext(Dispatchers.IO) {
+                    mGroupChatRepository.updateSession(session.copy(activeSceneId = scene.id))
+                }
+                AppViewEvent.PopupToastMessage(
+                    mContext.getString(R.string.group_chat_scene_switched, scene.name)
+                ).tryEmit()
+            }
+
+            GroupChatSceneCommand.NotACommand -> return
+        }
+        // 指令已经被消费掉，输入框不能留着这条命令
+        refreshState(inputDraft = "")
+    }
+
+    /** 点场景标签切换；传 null 回到不限场景。 */
+    @UiIntentObserver(GroupChatUiIntent.SwitchScene::class)
+    private suspend fun onSwitchScene(intent: GroupChatUiIntent.SwitchScene) {
+        val sessionId = mSessionId ?: return
+        val target = intent.sceneId
+        if (target.isNullOrBlank()) {
+            applySceneCommand(sessionId, GroupChatSceneCommand.Clear)
+        } else {
+            val session = withContext(Dispatchers.IO) {
+                mGroupChatRepository.getGroupChatData(sessionId)?.session
+            } ?: return
+            val scene = GroupChatScenes.decode(session.scenesJson)
+                .firstOrNull { it.id == target } ?: return
+            applySceneCommand(sessionId, GroupChatSceneCommand.SwitchTo(scene.name))
+        }
+    }
+
     @UiIntentObserver(GroupChatUiIntent.SelectSpeaker::class)
     private suspend fun onSelectSpeaker(intent: GroupChatUiIntent.SelectSpeaker) {
         val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
@@ -796,6 +878,12 @@ class GroupChatViewModel :
             clearReplyRetry()
             val images = mImageCoordinator.draftInputs()
             val rawInput = uiState.conversationState.inputDraft.trim()
+            // 场景指令不进模型：它是给系统看的命令，喂给 LLM 只会被当成一句台词念出来
+            val sceneCommand = GroupChatScenes.parseCommand(rawInput)
+            if (sceneCommand !is GroupChatSceneCommand.NotACommand) {
+                applySceneCommand(sessionId, sceneCommand)
+                return
+            }
             val selectionData = withContext(Dispatchers.IO) {
                 mGroupChatRepository.getSpeakerSelectionData(
                     sessionId = sessionId,
@@ -804,7 +892,8 @@ class GroupChatViewModel :
             } ?: return
             val initialData = GroupChatData(
                 session = selectionData.session,
-                members = selectionData.members,
+                // 只有在场的人参与本轮发言与角色卡注入，不在场的连名字都不该进 Prompt
+                members = sceneMembersOf(selectionData.session, selectionData.members),
                 messages = emptyList(),
                 summary = null
             )
@@ -2438,6 +2527,16 @@ class GroupChatViewModel :
         val hasAvailableProvider = mLLMRepository.getSelectedProvider() != null || data.members.any {
             mProviderSelectionResolver.getCharacterProviderOrNull(it.character) != null
         }
+        // 场景标签要能直接看出「这一场有谁」，所以把角色 ID 换成名字
+        val nameById = data.members.associate { it.character.id to it.character.name }
+        val sceneItems = GroupChatScenes.decode(data.session.scenesJson).map { scene ->
+            GroupChatSceneItem(
+                id = scene.id,
+                name = scene.name,
+                memberNames = scene.characterIds.mapNotNull { nameById[it] },
+                restrictMembers = scene.restrictsMembers
+            )
+        }
         // 构建并返回群聊完整 UI 状态
         return GroupChatUiState.Normal(
             imageState = mImageCoordinator.state,
@@ -2489,7 +2588,9 @@ class GroupChatViewModel :
             ),
             hasPromptInspection = mLastPromptInspection != null,
             hasAvailableProvider = hasAvailableProvider,
-            dialogState = dialogState
+            dialogState = dialogState,
+            scenes = sceneItems,
+            activeSceneId = data.session.activeSceneId
         )
     }
 

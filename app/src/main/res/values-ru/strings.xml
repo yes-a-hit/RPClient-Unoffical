@@ -1515,4 +1515,8 @@
     <string name="backup_and_restore_desc">Экспорт всего или импорт после переустановки</string>
     <string name="backup_include_secrets">Включить ключи</string>
     <string name="backup_include_secrets_hint">Выкл: ключи пустые, остальное полное</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>

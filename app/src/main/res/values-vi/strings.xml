@@ -1511,4 +1511,8 @@ Mở Cài đặt mô hình để kiểm tra khóa API, URL cơ sở, tên mô h�
     <string name="backup_and_restore_desc">Xuất tất cả hoặc nhập sau khi cài lại</string>
     <string name="backup_include_secrets">Kèm khoá API</string>
     <string name="backup_include_secrets_hint">Tắt: khoá trống, còn lại đầy đủ</string>
+    <string name="group_chat_scene_switched">Switched to "%1$s"</string>
+    <string name="group_chat_scene_cleared">Left the scene - all members are present again</string>
+    <string name="group_chat_scene_not_found">No scene named "%1$s"</string>
+    <string name="group_chat_scene_all">Everyone</string>
 </resources>
