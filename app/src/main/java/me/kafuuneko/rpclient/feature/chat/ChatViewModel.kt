@@ -455,6 +455,31 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
      * - 调用模型：根据全局开关决定采用流式（[generateStreaming]）或非流式（[generateOnce]）生成。
      * - 自动总结：生成完成后检测未总结消息量，达到阈值时自动触发增量总结。
      */
+    /**
+     * 戳一戳角色。
+     *
+     * 单聊没有成员栏，入口在消息里角色头像上（长按）。
+     * 和群聊一样复用发送链路：把话填进草稿再发，
+     * 正则、历史裁剪、世界书激活全都走原来那套。
+     */
+    @UiIntentObserver(ChatUiIntent.PokeCharacter::class)
+    private suspend fun onPokeCharacter() {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        if (mGenerationJob?.isCompleted == false) {
+            AppViewEvent.PopupToastMessageByResId(R.string.generation_already_running).tryEmit()
+            return
+        }
+        if (mImageCoordinator.state.processing) return
+        val template = AppModel.pokePrompt.ifBlank { "（戳了戳 {name}）" }
+        val poke = template.replace("{name}", uiState.character.name)
+        val reaction = AppModel.pokeReaction.trim()
+        val text = if (reaction.isBlank()) poke else "$poke\n$reaction"
+        uiState.copy(
+            conversationState = uiState.conversationState.copy(inputDraft = text)
+        ).setup()
+        onSendMessage()
+    }
+
     @UiIntentObserver(ChatUiIntent.SendMessage::class)
     private suspend fun onSendMessage() {
         val uiState = getOrNull<ChatUiState.Normal>() ?: return

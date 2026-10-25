@@ -22,10 +22,26 @@ sealed class GalleryUiState {
         /** 是否设为公开。 */
         val publicDraft: Boolean = true,
         /** 一句话说明草稿。 */
-        val descriptionDraft: String = ""
+        val descriptionDraft: String = "",
+        /** 相册名草稿。 */
+        val albumDraft: String = "",
+        /** 已存在的相册名，按图片数量排序。 */
+        val albums: List<String> = emptyList(),
+        /**
+         * 当前筛选的相册。
+         *
+         * null 表示全部；空串表示只看未分类——这两者必须分开，
+         * 否则「未分类」这个真实的分组永远点不到。
+         */
+        val selectedAlbum: String? = null,
+        /** 按当前相册筛选后用于展示的图片。 */
+        val visibleImages: List<GalleryImage> = images
     ) : GalleryUiState() {
         /** 空图库。 */
         val isEmpty: Boolean get() = images.isEmpty()
+
+        /** 筛选后为空但图库里确实有图。 */
+        val isFilteredEmpty: Boolean get() = !isEmpty && visibleImages.isEmpty()
     }
 }
 
@@ -60,6 +76,12 @@ sealed class GalleryUiIntent {
 
     /** 保存当前编辑。 */
     data object SaveEdit : GalleryUiIntent()
+
+    /** 切换相册筛选；null 为全部，空串为未分类。 */
+    data class SelectAlbum(val album: String?) : GalleryUiIntent()
+
+    /** 相册名草稿变化。 */
+    data class AlbumDraftChanged(val value: String) : GalleryUiIntent()
 
     /** 删除一张图。 */
     data class Delete(val id: String) : GalleryUiIntent()

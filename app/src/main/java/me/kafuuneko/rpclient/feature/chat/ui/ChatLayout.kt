@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -788,7 +789,13 @@ private fun MessageBubble(
                 avatarColor = if (message.speaker == character.name) character.accentColor else NarratorAvatarColor,
                 image = if (message.speaker == character.name) character.avatarImage else null,
                 size = 34,
-                modifier = Modifier.padding(end = 8.dp, top = 2.dp)
+                modifier = Modifier.padding(end = 8.dp, top = 2.dp),
+                // 长按角色头像戳一下；旁白的头像没有可戳的对象
+                onLongClick = if (message.speaker == character.name) {
+                    { ChatUiIntent.PokeCharacter.emit() }
+                } else {
+                    null
+                }
             )
         }
 
@@ -2077,11 +2084,25 @@ private fun AvatarPreview(
     avatarColor: Color,
     image: ImageBitmap?,
     size: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 长按头像触发；为 null 时不响应，用于用户自己那条。 */
+    onLongClick: (() -> Unit)? = null
 ) {
     val cornerRadius = remember(size) { (size * 0.28).coerceAtLeast(8.0).dp }
     Surface(
-        modifier = modifier.size(size.dp),
+        modifier = modifier
+            .size(size.dp)
+            .then(
+                if (onLongClick == null) {
+                    Modifier
+                } else {
+                    // 长按戳一下；短按不做事，头像本来也不是按钮
+                    Modifier.combinedClickable(
+                        onClick = {},
+                        onLongClick = onLongClick
+                    )
+                }
+            ),
         shape = RoundedCornerShape(cornerRadius),
         color = avatarColor.copy(alpha = 0.14f),
         border = BorderStroke(0.5.dp, avatarColor.copy(alpha = 0.30f))

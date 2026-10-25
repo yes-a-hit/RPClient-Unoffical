@@ -61,7 +61,11 @@ class GalleryStore(
      * 匹配顺序：名字精确 > 标签命中 > 说明包含关键字。
      * 角色绑定的图只在 [characterName] 匹配时返回。
      */
-    suspend fun search(keyword: String, characterName: String = ""): List<GalleryImage> =
+    suspend fun search(
+        keyword: String,
+        characterName: String = "",
+        album: String? = null
+    ): List<GalleryImage> =
         withContext(Dispatchers.IO) {
             val all = list()
             val key = keyword.trim()
@@ -71,12 +75,31 @@ class GalleryStore(
                     image.characterName.isBlank() ||
                     image.characterName == characterName
                 if (!ownable) return@filter false
+                // 相册过滤：null 表示不限，空串表示只要未分类
+                if (album != null && image.album.trim() != album) return@filter false
                 if (key.isBlank()) return@filter true
                 image.name.contains(key, ignoreCase = true) ||
                     image.labels.any { it.contains(key, ignoreCase = true) } ||
                     image.description.contains(key, ignoreCase = true)
             }
         }
+
+    /**
+     * 列出所有相册名，按出现次数从多到少。
+     *
+     * 不单独存相册表：相册就是图片上的一个字段，删掉最后一张图，
+     * 相册自然消失，不会留下一堆空壳。
+     */
+    suspend fun albums(): List<String> = withContext(Dispatchers.IO) {
+        list()
+            .map { it.album.trim() }
+            .filter { it.isNotEmpty() }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .map { it.key }
+    }
 
     /** 保存或更新一张图的元数据。 */
     suspend fun save(image: GalleryImage): GalleryImage = withContext(Dispatchers.IO) {
@@ -136,7 +159,10 @@ class GalleryStore(
                 characterName = obj.get("characterName")?.asString.orEmpty(),
                 isPublic = obj.get("isPublic")?.asBoolean ?: true,
                 description = obj.get("description")?.asString.orEmpty(),
-                addedAt = obj.get("addedAt")?.asLong ?: 0L
+                addedAt = obj.get("addedAt")?.asLong ?: 0L,
+                isAppearance = obj.get("isAppearance")?.asBoolean ?: false,
+                appearanceNote = obj.get("appearanceNote")?.asString.orEmpty(),
+                album = obj.get("album")?.asString.orEmpty()
             )
         }.getOrNull()
     }
@@ -150,5 +176,8 @@ class GalleryStore(
         addProperty("isPublic", image.isPublic)
         addProperty("description", image.description)
         addProperty("addedAt", image.addedAt)
+        addProperty("isAppearance", image.isAppearance)
+        addProperty("appearanceNote", image.appearanceNote)
+        addProperty("album", image.album)
     }
 }

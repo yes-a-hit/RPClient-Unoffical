@@ -115,6 +115,14 @@ sealed class ChatUiIntent {
      */
     data class ToggleOverridePersona(val enabled: Boolean) : ChatUiIntent()
 
+    /**
+     * 戳一戳角色。
+     *
+     * 单聊没有成员栏，戳的入口放在消息里角色头像上——
+     * 长按就是戳一下。
+     */
+    data object PokeCharacter : ChatUiIntent()
+
     data class SaveUserName(val value: String) : ChatUiIntent()
 
     data class SaveUserDescription(val value: String) : ChatUiIntent()

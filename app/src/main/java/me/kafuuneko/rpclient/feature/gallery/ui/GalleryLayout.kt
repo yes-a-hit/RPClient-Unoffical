@@ -1,6 +1,9 @@
 package me.kafuuneko.rpclient.feature.gallery.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AssistChip
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -88,6 +91,16 @@ fun GalleryLayout(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            if (state.albums.isNotEmpty() || state.images.any { it.album.isBlank() }) {
+                item {
+                    AlbumFilterRow(
+                        albums = state.albums,
+                        hasUnfiled = state.images.any { it.album.isBlank() },
+                        selected = state.selectedAlbum,
+                        onSelect = { GalleryUiIntent.SelectAlbum(it).emit() }
+                    )
+                }
+            }
             if (state.isEmpty) {
                 item {
                     Text(
@@ -97,7 +110,16 @@ fun GalleryLayout(
                     )
                 }
             }
-            items(state.images) { image ->
+            if (state.isFilteredEmpty) {
+                item {
+                    Text(
+                        text = "这个相册里还没有图片。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            items(state.visibleImages) { image ->
                 GalleryRow(
                     image = image,
                     onEdit = { GalleryUiIntent.EditLabels(image.id).emit() },
@@ -109,6 +131,36 @@ fun GalleryLayout(
 
     if (state.editingId != null) {
         GalleryEditDialog(state, emit)
+    }
+}
+
+/**
+ * 相册筛选条。
+ *
+ * 「全部」和「未分类」是两回事：前者是不过滤，后者是一个真实分组。
+ * 用空串代表未分类，用 null 代表不过滤，两者在状态里分得很清。
+ */
+@Composable
+private fun AlbumFilterRow(
+    albums: List<String>,
+    hasUnfiled: Boolean,
+    selected: String?,
+    onSelect: (String?) -> Unit
+) {
+    val chips = buildList {
+        add(null to "全部")
+        albums.forEach { add(it to it) }
+        if (hasUnfiled) add("" to "未分类")
+    }
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(chips.size) { index ->
+            val (value, label) = chips[index]
+            FilterChip(
+                selected = selected == value,
+                onClick = { onSelect(value) },
+                label = { Text(label, style = MaterialTheme.typography.labelLarge) }
+            )
+        }
     }
 }
 
@@ -206,6 +258,28 @@ private fun GalleryEditDialog(
         title = { Text("图片设置") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // 相册是归属，标签是检索入口——先说清楚哪个是哪个，
+                // 不然用户会把相册名也当标签填一遍
+                OutlinedTextField(
+                    value = state.albumDraft,
+                    onValueChange = { GalleryUiIntent.AlbumDraftChanged(it).emit() },
+                    label = { Text("相册（留空为未分类）") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (state.albums.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(state.albums.size) { index ->
+                            val album = state.albums[index]
+                            AssistChip(
+                                onClick = {
+                                    GalleryUiIntent.AlbumDraftChanged(album).emit()
+                                },
+                                label = { Text(album) }
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = state.labelDraft,
                     onValueChange = { GalleryUiIntent.LabelDraftChanged(it).emit() },

@@ -68,7 +68,8 @@ class GalleryViewModel : CoreViewModelWithEvent<GalleryUiIntent, GalleryUiState>
             labelDraft = image.labels.joinToString("、"),
             characterDraft = image.characterName,
             publicDraft = image.isPublic,
-            descriptionDraft = image.description
+            descriptionDraft = image.description,
+            albumDraft = image.album
         ).setup()
     }
 
@@ -119,11 +120,28 @@ class GalleryViewModel : CoreViewModelWithEvent<GalleryUiIntent, GalleryUiState>
                 labels = labels,
                 characterName = state.characterDraft.trim(),
                 isPublic = state.publicDraft,
-                description = state.descriptionDraft.trim()
+                description = state.descriptionDraft.trim(),
+                album = state.albumDraft.trim()
             )
         )
         GalleryViewEvent.Toast("已保存").tryEmit()
         publish()
+    }
+
+    /** 切换相册筛选。 */
+    @UiIntentObserver(GalleryUiIntent.SelectAlbum::class)
+    private fun onSelectAlbum(intent: GalleryUiIntent.SelectAlbum) {
+        val state = getOrNull<GalleryUiState.Ready>() ?: return
+        state.copy(
+            selectedAlbum = intent.album,
+            visibleImages = filterByAlbum(state.images, intent.album)
+        ).setup()
+    }
+
+    @UiIntentObserver(GalleryUiIntent.AlbumDraftChanged::class)
+    private fun onAlbumDraftChanged(intent: GalleryUiIntent.AlbumDraftChanged) {
+        val state = getOrNull<GalleryUiState.Ready>() ?: return
+        state.copy(albumDraft = intent.value).setup()
     }
 
     /** 删除一张图。 */
@@ -141,10 +159,32 @@ class GalleryViewModel : CoreViewModelWithEvent<GalleryUiIntent, GalleryUiState>
     /** 重新读取并发布。 */
     private suspend fun publish() {
         val images = mStore.list()
+        val albums = mStore.albums()
+        // 筛选的相册如果已经空了（最后一张图被删或改了归属），回到全部，
+        // 否则用户会停在一个永远空的页面上
+        val previous = getOrNull<GalleryUiState.Ready>()?.selectedAlbum
+        val selected = previous?.takeIf { it.isEmpty() || albums.contains(it) }
         GalleryUiState.Ready(
             images = images,
-            publicCount = images.count { it.isPublic }
+            publicCount = images.count { it.isPublic },
+            albums = albums,
+            selectedAlbum = selected,
+            visibleImages = filterByAlbum(images, selected)
         ).setup()
+    }
+
+    /**
+     * 按相册筛选。
+     *
+     * null = 全部；空串 = 未分类，是两回事。
+     */
+    private fun filterByAlbum(
+        images: List<GalleryImage>,
+        album: String?
+    ): List<GalleryImage> = if (album == null) {
+        images
+    } else {
+        images.filter { it.album.trim() == album }
     }
 
     /** 取文件显示名；失败时用固定名，避免空名落库。 */

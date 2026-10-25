@@ -7,6 +7,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
@@ -189,6 +191,7 @@ private fun GroupChatNormalView(
             AppTopBar(
                 title = state.title,
                 onBack = { emitIntent(GroupChatUiIntent.Back) },
+                leading = { GroupTopAvatars(state.members) },
                 actions = {
                     IconButton(
                         onClick = { emitIntent(GroupChatUiIntent.OpenPromptInspector) },
@@ -607,6 +610,16 @@ private fun GroupChatSettingsView(
             }
             item {
                 GroupSettingsSection(title = stringResource(R.string.chat_settings_actions)) {
+                    // 清空上下文：消息与摘要全清，群聊条目、成员和所有配置留着。
+                    // 有它才不用为了重开一段对话去重建整个群聊。
+                    SettingsActionRow(
+                        icon = Icons.Rounded.Refresh,
+                        title = stringResource(R.string.clear_context_action),
+                        subtitle = stringResource(R.string.clear_context_message),
+                        onClick = {
+                            emitIntent(GroupChatUiIntent.ClearConversationContextClick)
+                        }
+                    )
                     SettingsActionRow(
                         icon = Icons.Rounded.Delete,
                         title = stringResource(R.string.group_chat_delete_content_description),
@@ -2232,6 +2245,7 @@ private fun GroupChatPreview() {
             )
         )
     }
+
 }
 
 private val previewMembers = listOf(
@@ -2263,3 +2277,31 @@ private val previewMessages = listOf(
         time = "21:05"
     )
 )
+
+/**
+ * 顶栏群头像。
+ *
+ * 群聊没有「唯一一张脸」，这里用在场成员的真实头像并排表示——
+ * 比一个通用群组图标更有信息量，也顺带回答了「这个群到底有谁」。
+ */
+@Composable
+private fun GroupTopAvatars(members: List<GroupChatMemberItem>) {
+    val shown = members.filter { it.avatarImage != null }.take(2)
+    if (shown.isEmpty()) return
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        shown.forEach { member ->
+            Surface(
+                modifier = Modifier.size(26.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.background)
+            ) {
+                Image(
+                    bitmap = member.avatarImage!!,
+                    contentDescription = member.name,
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+    }
+}

@@ -39,6 +39,7 @@ fun AppTopBar(
     height: Dp = 50.dp,
     backIconPainter: Painter = painterResource(R.drawable.ic_back),
     onBack: () -> Unit = {},
+    leading: (@Composable () -> Unit)? = null,
     actions: @Composable () -> Unit = {}
 ) {
     Surface(
@@ -69,6 +70,11 @@ fun AppTopBar(
             )
 
             Spacer(modifier = Modifier.width(10.dp))
+
+            // 顶栏左侧插槽：群聊这类需要「标题配一张脸」的页面把头像放这里，
+            // 标题本身仍然保持单行省略，不因为头像挤压而换行
+            leading?.invoke()
+            if (leading != null) Spacer(modifier = Modifier.width(8.dp))
 
             Text(
                 modifier = Modifier.weight(1f),

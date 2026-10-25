@@ -31,6 +31,10 @@ import me.kafuuneko.rpclient.utils.toDefaultChatTitle
 import me.kafuuneko.rpclient.utils.filterLorebookGroups
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.lifecycle.viewModelScope
+import me.kafuuneko.rpclient.libs.room.repository.FileRepository
+import kotlinx.coroutines.launch
 
 /**
  * 新建单角色会话页状态持有者。
@@ -51,6 +55,7 @@ class ChatCreateViewModel : CoreViewModelWithEvent<ChatCreateUiIntent, ChatCreat
     private val mChatRepository by inject<ChatRepository>()
     private val mProviderSelectionResolver by inject<LLMProviderSelectionResolver>()
     private val mMacroResolver by inject<PromptMacroResolver>()
+    private val mFileRepository by inject<FileRepository>()
     private var mCharactersById: Map<Long, Character> = emptyMap()
 
     /** 初始化页面，并发拉取数据库中的全量角色与世界书条目。 */
@@ -115,13 +120,19 @@ class ChatCreateViewModel : CoreViewModelWithEvent<ChatCreateUiIntent, ChatCreat
                         characterName = character.name,
                         userName = userName
                     ),
-                    tags = character.getCharacterTagList()
+                    tags = character.getCharacterTagList(),
+                    avatarText = character.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    avatarColor = me.kafuuneko.rpclient.ui.theme.CharacterAccentColors[
+                        (character.id % me.kafuuneko.rpclient.ui.theme.CharacterAccentColors.size).toInt()
+                    ]
                 )
             },
             selectedCharacterFirstMessages = selectedCharacterFirstMessages,
             lorebookGroups = data.second,
             visibleLorebookGroups = data.second
         ).setup()
+        // 头像解码放后台，页面先用文字头像立即可见
+        loadCharacterAvatars()
     }
 
     /** 处理返回操作，迁移至 Finished 状态。 */
@@ -352,4 +363,37 @@ class ChatCreateViewModel : CoreViewModelWithEvent<ChatCreateUiIntent, ChatCreat
 
     /** 开场白解析结果包装类。 */
     private data class FirstMessageSelection(val value: String?)
+
+    /**
+     * 后台解码角色头像。
+     *
+     * 创建页一次最多展示几十个角色，不需要角色列表那套可见性驱动的 LRU 重活；
+     * 这里逐张解码、逐张发布，点开页面时先看到文字头像，图片随后填上。
+     */
+    private fun loadCharacterAvatars() {
+        val current = getOrNull<ChatCreateUiState.Normal>() ?: return
+        val pending = current.characters.filter { it.avatarImage == null }
+        if (pending.isEmpty()) return
+        viewModelScope.launch {
+            pending.forEach { item ->
+                val uuid = mCharactersById[item.id]?.avatar.orEmpty()
+                if (uuid.isBlank()) return@forEach
+                val bitmap = withContext(Dispatchers.IO) {
+                    mFileRepository.loadSampledBitmap(uuid, AVATAR_TARGET_PX, AVATAR_TARGET_PX)
+                } ?: return@forEach
+                val image = bitmap.asImageBitmap()
+                val latest = getOrNull<ChatCreateUiState.Normal>() ?: return@launch
+                latest.copy(
+                    characters = latest.characters.map {
+                        if (it.id == item.id) it.copy(avatarImage = image) else it
+                    }
+                ).setup()
+            }
+        }
+    }
+
+    private companion object {
+        /** 头像在列表里的展示边长（dp 约 46）折算后的采样尺寸。 */
+        const val AVATAR_TARGET_PX = 144
+    }
 }

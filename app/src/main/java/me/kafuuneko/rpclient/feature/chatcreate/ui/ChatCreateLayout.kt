@@ -62,6 +62,7 @@ import me.kafuuneko.rpclient.feature.chatcreate.presentation.ChatCreateUiState
 import me.kafuuneko.rpclient.utils.toggle
 import me.kafuuneko.rpclient.ui.theme.AppTheme
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
+import me.kafuuneko.rpclient.ui.widgets.RpAvatar
 import me.kafuuneko.rpclient.ui.widgets.RpIconBubble
 import me.kafuuneko.rpclient.ui.widgets.RpPageTitle
 import me.kafuuneko.rpclient.ui.widgets.RpLazyColumn
@@ -253,7 +254,11 @@ private fun CharacterOption(
         ) {
             RadioButton(selected = selected, onClick = onClick)
             Spacer(modifier = Modifier.width(8.dp))
-            RpIconBubble(Icons.Rounded.Person)
+            RpAvatar(
+                text = character.avatarText,
+                color = character.avatarColor,
+                image = character.avatarImage
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Column(
                 modifier = Modifier.weight(1f),

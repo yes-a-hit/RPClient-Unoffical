@@ -32,7 +32,15 @@ data class GalleryImage(
      */
     val isAppearance: Boolean = false,
     /** 外观图在角色身上的含义，例如「立绘」「被摸头时的表情」。 */
-    val appearanceNote: String = ""
+    val appearanceNote: String = "",
+    /**
+     * 所属相册。
+     *
+     * 和标签是两回事：标签可以有很多、可以临时加，是给模型检索用的；
+     * 相册是**归属**，一张图只在一个相册里，是给人翻的。
+     * 留空表示未分类。
+     */
+    val album: String = ""
 ) {
     /** 供模型检索的一句话摘要。 */
     fun toBrief(): String = buildString {
