@@ -104,7 +104,7 @@ fun GalleryLayout(
             if (state.isEmpty) {
                 item {
                     Text(
-                        text = "还没有图片。导入后可以贴标签、绑定角色，助手会按情境自己挑图发给你。",
+                        text = "还没有图片。导入后在「图片设置」里填标签和相册——标签给助手检索，相册留给你自己翻。绑定角色后助手会按情境自己挑图发给你。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
