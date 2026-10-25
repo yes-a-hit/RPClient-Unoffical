@@ -125,7 +125,11 @@ class ScriptPlayViewModel(
                 ScriptPlaySnapshot(
                     sceneId = startScene.id,
                     roundCount = 0,
-                    messages = emptyList()
+                    messages = emptyList(),
+                    variables = ScriptPlayEngine.initialVariables(pack, mPlay.variables),
+                    textVariables = ScriptPlayEngine.initialTextVariables(pack),
+                    castOverride = null,
+                    firedEvents = emptyList()
                 )
             } else {
                 null
@@ -342,13 +346,19 @@ class ScriptPlayViewModel(
         mSceneBackground = runCatching {
             resolveSceneBackground(target)
         }.getOrDefault("")
-        // 进入检查点场景时记快照，走偏了能退回来
+        // 进入检查点场景时记快照，走偏了能退回来。
+        // 变量、文本变量、在场名单、已触发事件必须一起记：只记场景号与对白的话，
+        // 回滚只是换了块背景板，电量和玩偶死活还原不到进入那一刻。
         if (target.checkpoint) {
             mPlay = mPlay.copy(
                 snapshot = ScriptPlaySnapshot(
                     sceneId = target.id,
                     roundCount = 0,
-                    messages = mPlay.messages
+                    messages = mPlay.messages,
+                    variables = mPlay.variables,
+                    textVariables = mPlay.textVariables,
+                    castOverride = mPlay.castOverride,
+                    firedEvents = mPlay.firedEvents
                 )
             )
         }
@@ -419,6 +429,11 @@ class ScriptPlayViewModel(
             messages = snapshot.messages,
             finished = false,
             endReason = "",
+            // 变量与在场名单一起还原；否则退回去只剩场景名对得上，状态全是错的
+            variables = snapshot.variables ?: mPlay.variables,
+            textVariables = snapshot.textVariables ?: mPlay.textVariables,
+            castOverride = snapshot.castOverride,
+            firedEvents = snapshot.firedEvents ?: mPlay.firedEvents,
             snapshot = snapshot
         )
         mSceneBackground = runCatching {
@@ -455,7 +470,12 @@ class ScriptPlayViewModel(
                 ScriptPlaySnapshot(
                     sceneId = start.id,
                     roundCount = 0,
-                    messages = emptyList()
+                    messages = emptyList(),
+                    // 重开后的起始快照要用复位后的初值，不能沿用上一局残留
+                    variables = ScriptPlayEngine.initialVariables(pack),
+                    textVariables = ScriptPlayEngine.initialTextVariables(pack),
+                    castOverride = null,
+                    firedEvents = emptyList()
                 )
             } else {
                 null
