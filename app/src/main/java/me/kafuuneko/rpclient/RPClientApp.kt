@@ -14,9 +14,7 @@ import me.kafuuneko.rpclient.libs.character.CharacterCardRepository
 import me.kafuuneko.rpclient.libs.assistant.AssistantSessionStore
 import me.kafuuneko.rpclient.libs.assistant.AssistantStore
 import me.kafuuneko.rpclient.libs.assistant.AssistantToolExecutor
-import me.kafuuneko.rpclient.libs.billing.PricingRepository
 import me.kafuuneko.rpclient.libs.billing.ProviderBalanceClient
-import me.kafuuneko.rpclient.libs.billing.UsageCostCalculator
 import me.kafuuneko.rpclient.libs.gallery.GalleryStore
 import me.kafuuneko.rpclient.libs.script.ScriptStore
 import me.kafuuneko.rpclient.libs.script.ScriptPlayStore
@@ -262,10 +260,8 @@ internal val appModules = module {
     single { GalleryStore(androidContext(), get()) }
     single { AssistantToolExecutor(get<AssistantStore>().sandboxRoot, get(), get(), get(), get()) }
 
-    // 计费：模型报价快照与服务商余额查询
-    single { PricingRepository(get(), get()) }
+    // 计费：只保留服务商余额查询，金额估算已整块移除
     single { ProviderBalanceClient(get(), get()) }
-    single { UsageCostCalculator(get()) }
 
     // 剧本存储：一个剧本一个 JSON 文件，不做数据库迁移
     single { ScriptStore(androidContext()) }

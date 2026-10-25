@@ -13,7 +13,4 @@ sealed class TokenUsageUiIntent {
 
     /** 刷新当前模型配置的账户余额。 */
     data object RefreshBalance : TokenUsageUiIntent()
-
-    /** 在线拉取最新模型报价并重算金额。 */
-    data object RefreshPricing : TokenUsageUiIntent()
 }

@@ -38,7 +38,6 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Numbers
-import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.Schedule
@@ -78,7 +77,6 @@ import me.kafuuneko.rpclient.feature.tokenusage.model.TokenUsageSummaryItem
 import me.kafuuneko.rpclient.feature.tokenusage.model.TokenUsageTrendPoint
 import me.kafuuneko.rpclient.feature.tokenusage.presentation.TokenUsageBalanceState
 import me.kafuuneko.rpclient.feature.tokenusage.presentation.TokenUsageChartMode
-import me.kafuuneko.rpclient.feature.tokenusage.presentation.TokenUsageCostState
 import me.kafuuneko.rpclient.feature.tokenusage.presentation.TokenUsageDialogState
 import me.kafuuneko.rpclient.feature.tokenusage.presentation.TokenUsagePeriod
 import me.kafuuneko.rpclient.feature.tokenusage.presentation.TokenUsageUiIntent
@@ -196,7 +194,7 @@ private fun UsageContent(
         }
         item { PeriodFilters(uiState.selectedPeriod, emit) }
         item { HeroSummaryCard(uiState.summary) }
-        item { BillingOverviewCard(uiState.cost, uiState.balance, emit) }
+        item { BillingOverviewCard(uiState.balance, emit) }
 
         // 空周期保留筛选和总览，只省略趋势、排行与请求明细。
         if (hasRecords) {
@@ -349,14 +347,13 @@ private fun PeriodFilters(
 
 /** 组合当前周期的总量、占比与细分指标。 */
 /**
- * 计费总览：当前周期的金额估算与账户余额。
+ * 账户余额卡。
  *
- * 金额来自报价快照，余额来自服务商接口，两者都可能拿不到；
- * 因此这里分别显示「有报价 / 无报价」「可用 / 不支持 / 失败」，不使用统一的占位数字。
+ * 只展示服务商返回的真实余额：此前这里还有一块「按报价估算的金额」，
+ * 但估算永远对不上账单，展示出来只会误导，已整块移除。
  */
 @Composable
 private fun BillingOverviewCard(
-    cost: TokenUsageCostState,
     balance: TokenUsageBalanceState,
     emit: TokenUsageUiIntent.() -> Unit
 ) {
@@ -373,26 +370,6 @@ private fun BillingOverviewCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            BillingHeader(
-                icon = Icons.Rounded.Payments,
-                title = stringResource(R.string.token_usage_cost_title),
-                onRefresh = { TokenUsageUiIntent.RefreshPricing.emit() },
-                refreshing = false
-            )
-            Text(
-                text = if (cost.hasPrice) formatCny(cost.totalCny) else PLACEHOLDER_VALUE,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = costSummaryText(cost),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
-
             BillingHeader(
                 icon = Icons.Rounded.Savings,
                 title = stringResource(R.string.token_usage_balance_title),
@@ -448,22 +425,6 @@ private fun BillingHeader(
     }
 }
 
-/** 金额说明：覆盖比例与未定价模型。 */
-@Composable
-private fun costSummaryText(cost: TokenUsageCostState): String {
-    val percent = (cost.coverage * 100).toInt()
-    return when {
-        !cost.hasPrice -> stringResource(R.string.token_usage_cost_no_price)
-        cost.unpricedModels.isNotEmpty() -> stringResource(
-            R.string.token_usage_cost_unpriced,
-            percent,
-            cost.unpricedModels.joinToString(", ")
-        )
-
-        else -> stringResource(R.string.token_usage_cost_coverage, percent)
-    }
-}
-
 /** 余额说明；不支持与失败分别给出不同文案。 */
 @Composable
 private fun balanceText(balance: TokenUsageBalanceState): String = when (balance) {
@@ -478,11 +439,6 @@ private fun balanceText(balance: TokenUsageBalanceState): String = when (balance
     is TokenUsageBalanceState.Failed -> balance.reason
 }
 
-/** 人民币金额格式化：小额保留四位小数，便于观察单次请求成本。 */
-private fun formatCny(value: Double): String =
-    if (value < 0.01) String.format(Locale.US, "¥%.4f", value)
-    else String.format(Locale.US, "¥%.2f", value)
-
 /** 余额金额格式化，统一两位小数。 */
 private fun formatAmount(value: Double): String = String.format(Locale.US, "%.2f", value)
 
@@ -492,9 +448,6 @@ private fun currencyPrefix(currency: String): String = when (currency.uppercase(
     "CNY", "RMB" -> "¥"
     else -> "$currency "
 }
-
-/** 缺失数值的统一占位符，避免把「暂无数据」渲染成 0。 */
-private const val PLACEHOLDER_VALUE = "—"
 
 @Composable
 private fun HeroSummaryCard(summary: TokenUsageSummaryItem) {
