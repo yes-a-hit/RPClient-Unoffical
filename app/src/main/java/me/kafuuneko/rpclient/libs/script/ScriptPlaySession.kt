@@ -66,11 +66,27 @@ data class ScriptPlaythrough(
     val textVariables: Map<String, String>? = null
 )
 
-/** 检查点快照：够还原到进入该场景的那一刻。 */
+/**
+ * 检查点快照：还原到进入该场景的那一刻。
+ *
+ * 只存场景号和对白是不够的——变量、已触发事件、在场名单这些东西
+ * 才是「走偏」的载体。少了它们，回滚只是换了块背景板，
+ * 玩家一回去发现自己血量还是空的、玩偶还是死过的，等于没退。
+ *
+ * 全部字段可空：旧存档是 Gson 用 Unsafe 建的，缺的字段读出来是 null。
+ */
 data class ScriptPlaySnapshot(
     val sceneId: String,
     val roundCount: Int,
-    val messages: List<ScriptPlayMessage> = emptyList()
+    val messages: List<ScriptPlayMessage> = emptyList(),
+    /** 进入该场景时的变量值。 */
+    val variables: Map<String, Int>? = null,
+    /** 进入该场景时的文本变量，位置与线索都在这里。 */
+    val textVariables: Map<String, String>? = null,
+    /** 进入该场景时的在场名单改动；null 表示当时以场景自带 cast 为准。 */
+    val castOverride: List<String>? = null,
+    /** 进入该场景时已触发过的事件，回滚后这些不该重演。 */
+    val firedEvents: List<String>? = null
 )
 
 /** 场景状态快照，供界面展示。 */
