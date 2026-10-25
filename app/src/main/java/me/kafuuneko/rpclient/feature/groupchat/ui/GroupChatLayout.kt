@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -2286,21 +2287,45 @@ private val previewMessages = listOf(
  */
 @Composable
 private fun GroupTopAvatars(members: List<GroupChatMemberItem>) {
-    val shown = members.filter { it.avatarImage != null }.take(2)
+    // 没上传头像的角色也要出现——成员本身就是信息，
+    // 只显示「有图的那几个」会让整个顶栏在纯文字卡群里直接消失
+    val shown = members.take(2)
     if (shown.isEmpty()) return
-    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        shown.forEach { member ->
+    // 叠放而不是并排：顶栏宽度要留给标题，两个 22dp 头像叠起来只占 32dp
+    val avatarSize = 22.dp
+    val overlap = 12.dp
+    Box(
+        modifier = Modifier
+            .width(avatarSize + overlap * (shown.size - 1))
+            .height(avatarSize)
+    ) {
+        shown.forEachIndexed { index, member ->
+            val accent = getMacaronColor(member.name)
+            val bitmap = member.avatarImage
             Surface(
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier
+                    .offset(x = overlap * index)
+                    .size(avatarSize),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                color = accent.copy(alpha = 0.18f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.background)
             ) {
-                Image(
-                    bitmap = member.avatarImage!!,
-                    contentDescription = member.name,
-                    contentScale = ContentScale.Crop
-                )
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = member.name,
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = member.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = accent,
+                            maxLines = 1
+                        )
+                    }
+                }
             }
         }
     }
