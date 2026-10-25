@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Image as ImageIcon
 import androidx.compose.material.icons.rounded.Info
@@ -73,6 +74,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -144,6 +146,7 @@ import me.kafuuneko.rpclient.ui.message.MessageImageEditButton
 import me.kafuuneko.rpclient.ui.message.MessageImageGallery
 import me.kafuuneko.rpclient.ui.dialog.MessageImageViewerDialog
 import me.kafuuneko.rpclient.ui.theme.getMacaronColor
+import me.kafuuneko.rpclient.ui.dialog.AppDialogScaffold
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
 import me.kafuuneko.rpclient.ui.widgets.MarkdownMessageText
 import me.kafuuneko.rpclient.ui.widgets.NoProviderBanner
@@ -614,6 +617,42 @@ private fun GroupChatSettingsView(
                         onToggleEntry = {
                             emitIntent(GroupChatUiIntent.ToggleLorebookEntry(it))
                         }
+                    )
+                }
+            }
+            item {
+                GroupSettingsSection(title = stringResource(R.string.group_chat_scenes)) {
+                    // 场景把同一个人在不同地点的状态分开：不在场的角色不参与这一轮发言。
+                    // 没有场景时这里只有一句说明和一个新建按钮，不额外占位。
+                    if (state.scenes.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.group_chat_scene_empty_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    state.scenes.forEach { scene ->
+                        SettingsActionRow(
+                            icon = Icons.Rounded.Place,
+                            title = scene.name,
+                            subtitle = when {
+                                !scene.restrictMembers ->
+                                    stringResource(R.string.group_chat_scene_all_present)
+
+                                scene.memberNames.isEmpty() ->
+                                    stringResource(R.string.group_chat_scene_nobody)
+
+                                else -> scene.memberNames.joinToString("、")
+                            },
+                            onClick = {
+                                emitIntent(GroupChatUiIntent.OpenSceneEditor(scene.id))
+                            }
+                        )
+                    }
+                    SettingsActionRow(
+                        icon = Icons.Rounded.Add,
+                        title = stringResource(R.string.group_chat_scene_add),
+                        onClick = { emitIntent(GroupChatUiIntent.OpenSceneEditor(null)) }
                     )
                 }
             }
@@ -2191,6 +2230,88 @@ private fun DialogSwitch(
             dismissText = stringResource(R.string.cancel),
             onConfirm = { emitIntent(GroupChatUiIntent.ConfirmDeleteSession) }
         )
+
+        is GroupChatDialogState.SceneEditor -> SceneEditorDialog(
+            dialogState = dialogState,
+            members = state.members,
+            emitIntent = emitIntent
+        )
+    }
+}
+
+/**
+ * 场景编辑对话框。
+ *
+ * 成员一个都不选等于「全员在场」，这与运行时的过滤口径一致，
+ * 所以界面上必须把这句话写出来，否则用户会以为没选就没人说话。
+ */
+@Composable
+private fun SceneEditorDialog(
+    dialogState: GroupChatDialogState.SceneEditor,
+    members: List<GroupChatMemberItem>,
+    emitIntent: (GroupChatUiIntent) -> Unit
+) {
+    AppDialogScaffold(
+        onDismissRequest = { emitIntent(GroupChatUiIntent.DismissDialog) },
+        title = stringResource(
+            if (dialogState.sceneId == null) {
+                R.string.group_chat_scene_add
+            } else {
+                R.string.group_chat_scene_edit
+            }
+        ),
+        confirmText = stringResource(R.string.save),
+        confirmEnabled = dialogState.name.isNotBlank(),
+        onConfirm = { emitIntent(GroupChatUiIntent.SaveSceneEditor) },
+        scrollableContent = true
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = dialogState.name,
+                onValueChange = { emitIntent(GroupChatUiIntent.ChangeSceneEditorName(it)) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.group_chat_scene_name)) },
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = dialogState.description,
+                onValueChange = {
+                    emitIntent(GroupChatUiIntent.ChangeSceneEditorDescription(it))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.group_chat_scene_description)) },
+                minLines = 2,
+                maxLines = 4
+            )
+            Text(
+                text = stringResource(R.string.group_chat_scene_members_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                members.forEach { member ->
+                    FilterChip(
+                        selected = dialogState.memberIds.contains(member.id),
+                        onClick = {
+                            emitIntent(GroupChatUiIntent.ToggleSceneEditorMember(member.id))
+                        },
+                        label = { Text(member.name) }
+                    )
+                }
+            }
+            if (dialogState.sceneId != null) {
+                TextButton(
+                    onClick = {
+                        emitIntent(GroupChatUiIntent.DeleteScene(dialogState.sceneId))
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.delete),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
     }
 }
 

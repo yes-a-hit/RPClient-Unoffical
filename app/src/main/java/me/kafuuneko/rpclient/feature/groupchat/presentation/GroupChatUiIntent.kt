@@ -105,6 +105,17 @@ sealed class GroupChatUiIntent {
 
     data object DeleteSessionClick : GroupChatUiIntent()
     data object ConfirmDeleteSession : GroupChatUiIntent()
+
+    /** 打开场景编辑器；sceneId 为 null 表示新建。 */
+    data class OpenSceneEditor(val sceneId: String? = null) : GroupChatUiIntent()
+    data class ChangeSceneEditorName(val value: String) : GroupChatUiIntent()
+    data class ChangeSceneEditorDescription(val value: String) : GroupChatUiIntent()
+
+    /** 切换某个角色是否驻扎在该场景；空集合代表全员在场。 */
+    data class ToggleSceneEditorMember(val characterId: Long) : GroupChatUiIntent()
+    data object SaveSceneEditor : GroupChatUiIntent()
+    data class DeleteScene(val sceneId: String) : GroupChatUiIntent()
+
     data object OpenProviderSettings : GroupChatUiIntent()
     data object DismissDialog : GroupChatUiIntent()
 }

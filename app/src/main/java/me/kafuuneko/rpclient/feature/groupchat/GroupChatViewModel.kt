@@ -90,6 +90,7 @@ import me.kafuuneko.rpclient.libs.regex.RegexScriptRuntime
 import me.kafuuneko.rpclient.libs.regex.ScopedRegexScript
 import me.kafuuneko.rpclient.libs.room.entity.GroupChatMessage
 import me.kafuuneko.rpclient.libs.groupchat.GroupChatScenes
+import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatScene
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatSceneCommand
 import me.kafuuneko.rpclient.libs.room.entity.GroupChatSession
 import me.kafuuneko.rpclient.libs.room.entity.LLMProvider
@@ -1796,6 +1797,105 @@ class GroupChatViewModel :
         uiState.copy(dialogState = GroupChatDialogState.None).setup()
     }
 
+    @UiIntentObserver(GroupChatUiIntent.OpenSceneEditor::class)
+    private suspend fun onOpenSceneEditor(intent: GroupChatUiIntent.OpenSceneEditor) {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        val session = withContext(Dispatchers.IO) {
+            mGroupChatRepository.getGroupChatData(uiState.sessionId)?.session
+        } ?: return
+        val target = intent.sceneId?.let { id ->
+            GroupChatScenes.decode(session.scenesJson).firstOrNull { it.id == id }
+        }
+        uiState.copy(
+            dialogState = GroupChatDialogState.SceneEditor(
+                sceneId = target?.id,
+                name = target?.name.orEmpty(),
+                memberIds = target?.characterIds?.toSet().orEmpty(),
+                description = target?.description.orEmpty()
+            )
+        ).setup()
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.ChangeSceneEditorName::class)
+    private fun onChangeSceneEditorName(intent: GroupChatUiIntent.ChangeSceneEditorName) {
+        updateSceneEditor { it.copy(name = intent.value) }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.ChangeSceneEditorDescription::class)
+    private fun onChangeSceneEditorDescription(
+        intent: GroupChatUiIntent.ChangeSceneEditorDescription
+    ) {
+        updateSceneEditor { it.copy(description = intent.value) }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.ToggleSceneEditorMember::class)
+    private fun onToggleSceneEditorMember(intent: GroupChatUiIntent.ToggleSceneEditorMember) {
+        updateSceneEditor { editor ->
+            val next = editor.memberIds.toMutableSet()
+            if (!next.add(intent.characterId)) next.remove(intent.characterId)
+            editor.copy(memberIds = next)
+        }
+    }
+
+    private fun updateSceneEditor(transform: (GroupChatDialogState.SceneEditor) -> GroupChatDialogState.SceneEditor) {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        val editor = uiState.dialogState as? GroupChatDialogState.SceneEditor ?: return
+        uiState.copy(dialogState = transform(editor)).setup()
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.SaveSceneEditor::class)
+    private suspend fun onSaveSceneEditor() {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        val editor = uiState.dialogState as? GroupChatDialogState.SceneEditor ?: return
+        val name = editor.name.trim()
+        // 无名场景在标签行里无法点选，等于建了一个点不动的死条目
+        if (name.isEmpty()) return
+        val session = withContext(Dispatchers.IO) {
+            mGroupChatRepository.getGroupChatData(uiState.sessionId)?.session
+        } ?: return
+        val existing = GroupChatScenes.decode(session.scenesJson)
+        val scene = GroupChatScene(
+            id = editor.sceneId ?: UUID.randomUUID().toString(),
+            name = name,
+            description = editor.description.trim(),
+            characterIds = editor.memberIds.toList()
+        )
+        val updated = if (editor.sceneId == null) {
+            existing + scene
+        } else {
+            existing.map { if (it.id == scene.id) scene else it }
+        }
+        withContext(Dispatchers.IO) {
+            mGroupChatRepository.updateSession(
+                session.copy(scenesJson = GroupChatScenes.encode(updated))
+            )
+        }
+        uiState.copy(dialogState = GroupChatDialogState.None).setup()
+        refreshState()
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.DeleteScene::class)
+    private suspend fun onDeleteScene(intent: GroupChatUiIntent.DeleteScene) {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        val session = withContext(Dispatchers.IO) {
+            mGroupChatRepository.getGroupChatData(uiState.sessionId)?.session
+        } ?: return
+        val remaining = GroupChatScenes.decode(session.scenesJson)
+            .filterNot { it.id == intent.sceneId }
+        // 删掉的正好是当前场景时必须一起清空，否则发言者过滤会指向一个不存在的场景
+        val activeId = if (session.activeSceneId == intent.sceneId) "" else session.activeSceneId
+        withContext(Dispatchers.IO) {
+            mGroupChatRepository.updateSession(
+                session.copy(
+                    scenesJson = GroupChatScenes.encode(remaining),
+                    activeSceneId = activeId
+                )
+            )
+        }
+        uiState.copy(dialogState = GroupChatDialogState.None).setup()
+        refreshState()
+    }
+
     /**
      * 启动一轮或自动多轮的群聊多角色生成循环。
      *
@@ -2582,6 +2682,7 @@ class GroupChatViewModel :
                 newGroupChatPromptDraft = data.session.newGroupChatPromptOverride,
                 titleDraft = data.session.title,
                 availableCharacters = availableCharacters,
+                scenes = sceneItems,
                 lorebookGroups = lorebookGroups,
                 visibleLorebookGroups = lorebookGroups.filterForQuery(lorebookQuery),
                 lorebookQuery = lorebookQuery

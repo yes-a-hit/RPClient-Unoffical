@@ -135,6 +135,8 @@ data class GroupChatSettingsState(
     val titleDraft: String = "",
     /** 当前流程允许选择的角色列表。 */
     val availableCharacters: List<GroupChatAvailableCharacterItem> = emptyList(),
+    /** 当前群聊已配置的场景，供设置页编辑。 */
+    val scenes: List<GroupChatSceneItem> = emptyList(),
     /** 按世界书分组后的条目列表。 */
     val lorebookGroups: List<GroupChatLorebookGroupItem> = emptyList(),
     /** 按搜索条件过滤后实际展示的世界书分组。 */
@@ -173,6 +175,19 @@ sealed class GroupChatDialogState {
     data class PromptInspector(val inspection: PromptInspection) : GroupChatDialogState()
     data class DeleteMessageConfirm(val messageId: Long) : GroupChatDialogState()
     data class DeleteSessionConfirm(val title: String) : GroupChatDialogState()
+
+    /**
+     * 场景编辑对话框。
+     *
+     * [sceneId] 为 null 表示新建；[memberIds] 为空表示全员在场——
+     * 与运行时口径一致，空集合不是「没人」。
+     */
+    data class SceneEditor(
+        val sceneId: String? = null,
+        val name: String = "",
+        val memberIds: Set<Long> = emptySet(),
+        val description: String = ""
+    ) : GroupChatDialogState()
 }
 
 /** 群聊页面当前展示的一级页面。 */

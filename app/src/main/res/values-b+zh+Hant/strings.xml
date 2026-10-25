@@ -1509,4 +1509,13 @@
     <string name="group_chat_scene_cleared">已離開場景，全體成員重新在場</string>
     <string name="group_chat_scene_not_found">沒有名為「%1$s」的場景</string>
     <string name="group_chat_scene_all">全員</string>
+    <string name="group_chat_scene_add">新建場景</string>
+    <string name="group_chat_scene_edit">編輯場景</string>
+    <string name="group_chat_scene_name">場景名</string>
+    <string name="group_chat_scene_description">場景說明（可選）</string>
+    <string name="group_chat_scene_members_hint">點選駐紮在此的角色；一個都不選表示全員在場</string>
+    <string name="group_chat_scenes">場景</string>
+    <string name="group_chat_scene_empty_hint">還沒配過場景。加一個就能把同一個群聊分成不同地點，每個地點只讓在場的人發言。</string>
+    <string name="group_chat_scene_all_present">全員在場</string>
+    <string name="group_chat_scene_nobody">還沒有人</string>
 </resources>

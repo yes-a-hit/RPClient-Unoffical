@@ -1565,4 +1565,13 @@
     <string name="group_chat_scene_cleared">已离开场景，全体成员重新在场</string>
     <string name="group_chat_scene_not_found">没有名为「%1$s」的场景</string>
     <string name="group_chat_scene_all">全员</string>
+    <string name="group_chat_scene_add">新建场景</string>
+    <string name="group_chat_scene_edit">编辑场景</string>
+    <string name="group_chat_scene_name">场景名</string>
+    <string name="group_chat_scene_description">场景说明（可选）</string>
+    <string name="group_chat_scene_members_hint">点选驻扎在此的角色；一个都不选表示全员在场</string>
+    <string name="group_chat_scenes">场景</string>
+    <string name="group_chat_scene_empty_hint">还没配过场景。加一个就能把同一个群聊分成不同地点，每个地点只让在场的人发言。</string>
+    <string name="group_chat_scene_all_present">全员在场</string>
+    <string name="group_chat_scene_nobody">还没有人</string>
 </resources>
