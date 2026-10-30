@@ -1,5 +1,7 @@
 package me.kafuuneko.rpclient.libs.assistant
 
+import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -7,6 +9,9 @@ import kotlinx.coroutines.withContext
 import me.kafuuneko.rpclient.libs.assistant.AssistantToolCatalog.longOrNull
 import me.kafuuneko.rpclient.libs.assistant.AssistantToolCatalog.stringList
 import me.kafuuneko.rpclient.libs.assistant.AssistantToolCatalog.stringOrNull
+import me.kafuuneko.rpclient.libs.character.CharacterProfileCodec
+import me.kafuuneko.rpclient.libs.character.CharacterProfileExtra
+import me.kafuuneko.rpclient.libs.character.RelationshipStatus
 import me.kafuuneko.rpclient.libs.room.entity.Character
 import me.kafuuneko.rpclient.libs.room.entity.LorebookEntry
 import me.kafuuneko.rpclient.libs.room.repository.CharacterRepository
@@ -30,7 +35,15 @@ class AssistantToolExecutor(
     private val mCharacterRepository: CharacterRepository,
     private val mLorebookRepository: LorebookRepository,
     private val mScriptStore: ScriptStore,
-    private val mGalleryStore: GalleryStore
+    private val mGalleryStore: GalleryStore,
+    /**
+     * 角色扩展档案编解码器。
+     *
+     * 角色卡的「年龄 / 性别 / 感情经历 / 性经历 / 边界」这类自定义栏目不存在数据库列里，
+     * 统一以 `rpclient_profile` 命名空间塞进 `extensionsJson`。助手要填这些栏目就必须
+     * 复用与界面完全相同的编解码路径，否则两边写出来的 JSON 结构会漂移。
+     */
+    private val mProfileCodec: CharacterProfileCodec = CharacterProfileCodec(Gson())
 ) {
 
     /** 剧本编解码器，仅用于把已有剧本回填给模型查看。 */
@@ -145,17 +158,102 @@ class AssistantToolExecutor(
         val id = arguments.longOrNull("id") ?: return "缺少参数 id"
         val character = mCharacterRepository.getCharacterById(id)
             ?: return "没有 id=$id 的角色卡"
+        val profile = mProfileCodec.extract(character.extensionsJson)
         return listOf(
             "id=${character.id}",
             "name=${character.name}",
+            "tags=${character.getCharacterTagList().joinToString("、")}",
             "description=${character.description}",
             "personality=${character.personality}",
             "scenario=${character.scenario}",
             "firstMessages=${character.firstMessages}",
             "postHistoryInstructions=${character.postHistoryInstructions}",
             "creatorNotes=${character.creatorNotes}",
-            "systemPrompt=${character.systemPrompt}"
+            "systemPrompt=${character.systemPrompt}",
+            "profile=" + describeProfile(profile)
         ).joinToString("\n")
+    }
+
+    /**
+     * 把扩展档案渲染成一行可读文本，供模型确认哪些栏目已经填过。
+     *
+     * 空档案显式返回「未填写（全部栏目为空）」，避免模型把缺省当成「作者确认没有」。
+     */
+    private fun describeProfile(profile: CharacterProfileExtra): String {
+        if (!profile.hasContent) return "未填写（全部栏目为空）"
+        val parts = buildList {
+            if (profile.age.isNotBlank()) add("age=${profile.age}")
+            if (profile.gender.isNotBlank()) add("gender=${profile.gender}")
+            if (profile.occupation.isNotBlank()) add("occupation=${profile.occupation}")
+            if (profile.orientation.isNotBlank()) add("orientation=${profile.orientation}")
+            if (profile.relationshipStatus != RelationshipStatus.Unspecified) {
+                add("relationshipStatus=${profile.relationshipStatus.persistedValue}")
+            }
+            profile.hasRomanticHistory?.let { add("hasRomanticHistory=$it") }
+            if (profile.romanticHistory.isNotBlank()) add("romanticHistory=${profile.romanticHistory}")
+            profile.hasSexualHistory?.let { add("hasSexualHistory=$it") }
+            if (profile.sexualHistory.isNotBlank()) add("sexualHistory=${profile.sexualHistory}")
+            if (profile.boundaries.isNotBlank()) add("boundaries=${profile.boundaries}")
+            if (profile.likes.isNotBlank()) add("likes=${profile.likes}")
+            if (profile.dislikes.isNotBlank()) add("dislikes=${profile.dislikes}")
+            if (profile.extraNotes.isNotBlank()) add("extraNotes=${profile.extraNotes}")
+        }
+        return parts.joinToString("；")
+    }
+
+    /**
+     * 解析模型传来的扩展档案对象。
+     *
+     * 只接受非空字段，未出现的字段保持 `null` 以便调用方区分「本次没提」与「本次清空」。
+     * 布尔字段同时接受 true/false 与 "yes"/"no"/"true"/"false" 字符串，
+     * 因为多数模型更习惯把三态答案写成英文词而不是 JSON 布尔。
+     */
+    private fun parseProfile(raw: JsonObject): Map<String, Any?> = buildMap {
+        raw.stringOrNull("age")?.let { put("age", it.trim()) }
+        raw.stringOrNull("gender")?.let { put("gender", it.trim()) }
+        raw.stringOrNull("occupation")?.let { put("occupation", it.trim()) }
+        raw.stringOrNull("orientation")?.let { put("orientation", it.trim()) }
+        raw.stringOrNull("relationshipStatus")?.let { put("relationshipStatus", it.trim()) }
+        raw.triStateOrNull("hasRomanticHistory")?.let { put("hasRomanticHistory", it) }
+        raw.stringOrNull("romanticHistory")?.let { put("romanticHistory", it.trim()) }
+        raw.triStateOrNull("hasSexualHistory")?.let { put("hasSexualHistory", it) }
+        raw.stringOrNull("sexualHistory")?.let { put("sexualHistory", it.trim()) }
+        raw.stringOrNull("boundaries")?.let { put("boundaries", it.trim()) }
+        raw.stringOrNull("likes")?.let { put("likes", it.trim()) }
+        raw.stringOrNull("dislikes")?.let { put("dislikes", it.trim()) }
+        raw.stringOrNull("extraNotes")?.let { put("extraNotes", it.trim()) }
+    }
+
+    /**
+     * 把档案补丁合并进已有档案；补丁里没出现的字段一律保留原值。
+     *
+     * `Map<String, Any?>` 里的值要么是 String（文本栏目）要么是 Boolean?（三态栏目），
+     * 空字符串代表「本次主动清空这一栏」。
+     */
+    private fun mergeProfile(
+        base: CharacterProfileExtra,
+        patch: Map<String, Any?>
+    ): CharacterProfileExtra {
+        fun text(key: String, fallback: String): String = patch[key] as? String ?: fallback
+        fun flag(key: String, fallback: Boolean?): Boolean? =
+            if (patch.containsKey(key)) patch[key] as? Boolean else fallback
+        return CharacterProfileExtra(
+            age = text("age", base.age),
+            gender = text("gender", base.gender),
+            occupation = text("occupation", base.occupation),
+            orientation = text("orientation", base.orientation),
+            relationshipStatus = (patch["relationshipStatus"] as? String)?.let {
+                RelationshipStatus.fromPersistedValue(it)
+            } ?: base.relationshipStatus,
+            hasRomanticHistory = flag("hasRomanticHistory", base.hasRomanticHistory),
+            romanticHistory = text("romanticHistory", base.romanticHistory),
+            hasSexualHistory = flag("hasSexualHistory", base.hasSexualHistory),
+            sexualHistory = text("sexualHistory", base.sexualHistory),
+            boundaries = text("boundaries", base.boundaries),
+            likes = text("likes", base.likes),
+            dislikes = text("dislikes", base.dislikes),
+            extraNotes = text("extraNotes", base.extraNotes)
+        )
     }
 
     /** 列出已保存的剧本，含场景数量。 */
@@ -198,6 +296,9 @@ class AssistantToolExecutor(
     private suspend fun createCharacter(arguments: JsonObject): String {
         val name = arguments.stringOrNull("name")?.trim().orEmpty()
         if (name.isBlank()) return "缺少参数 name"
+        // 扩展档案（年龄/性别/感情史/性经历/边界……）走与界面相同的编解码路径
+        val profilePatch = arguments.getAsJsonObject("profile")?.let(::parseProfile).orEmpty()
+        val profile = mergeProfile(CharacterProfileExtra(), profilePatch)
         val character = Character(
             name = name,
             avatar = "",
@@ -207,7 +308,8 @@ class AssistantToolExecutor(
             scenario = arguments.stringOrNull("scenario")?.trim().orEmpty(),
             firstMessages = arguments.stringOrNull("firstMessage")?.trim().orEmpty(),
             examplesOfDialogue = arguments.stringOrNull("exampleDialogue")?.trim().orEmpty(),
-            postHistoryInstructions = arguments.stringOrNull("postHistoryInstructions")?.trim().orEmpty()
+            postHistoryInstructions = arguments.stringOrNull("postHistoryInstructions")?.trim().orEmpty(),
+            extensionsJson = mProfileCodec.inject("{}", profile)
         )
         // 同名就停下，不动已有的那张卡。
         //
@@ -233,7 +335,12 @@ class AssistantToolExecutor(
             }
         }
         val id = mCharacterRepository.saveCharacter(character)
-        return "已创建角色卡 id=$id（名称：$name）"
+        val profileNote = if (profile.hasContent) {
+            "，扩展档案已写入：${describeProfile(profile)}"
+        } else {
+            ""
+        }
+        return "已创建角色卡 id=$id（名称：$name$profileNote）"
     }
 
     /** 按白名单字段更新角色卡；未提供的字段保持原值。 */
@@ -245,6 +352,16 @@ class AssistantToolExecutor(
         val current = mCharacterRepository.getCharacterById(id)
             ?: return "没有 id=$id 的角色卡"
 
+        // 扩展档案按字段级合并：只改 fields.profile 里出现的栏目，其余保持原值。
+        // 直接把整个 profile 覆盖会让模型一个字段没提就把别的栏目清空。
+        val profilePatch = patch.getAsJsonObject("profile")?.let(::parseProfile).orEmpty()
+        val currentProfile = mProfileCodec.extract(current.extensionsJson)
+        val nextProfile = if (profilePatch.isEmpty()) {
+            currentProfile
+        } else {
+            mergeProfile(currentProfile, profilePatch)
+        }
+
         val updated = current.copy(
             name = patch.stringOrNull("name") ?: current.name,
             description = patch.stringOrNull("description") ?: current.description,
@@ -254,7 +371,12 @@ class AssistantToolExecutor(
             postHistoryInstructions = patch.stringOrNull("postHistoryInstructions")
                 ?: current.postHistoryInstructions,
             creatorNotes = patch.stringOrNull("creatorNotes") ?: current.creatorNotes,
-            systemPrompt = patch.stringOrNull("systemPrompt") ?: current.systemPrompt
+            systemPrompt = patch.stringOrNull("systemPrompt") ?: current.systemPrompt,
+            extensionsJson = if (profilePatch.isEmpty()) {
+                current.extensionsJson
+            } else {
+                mProfileCodec.inject(current.extensionsJson, nextProfile)
+            }
         )
         if (updated == current) return "没有需要修改的字段。"
         mCharacterRepository.updateCharacter(updated)
@@ -272,6 +394,7 @@ class AssistantToolExecutor(
         if (before.postHistoryInstructions != after.postHistoryInstructions) add("postHistoryInstructions")
         if (before.creatorNotes != after.creatorNotes) add("creatorNotes")
         if (before.systemPrompt != after.systemPrompt) add("systemPrompt")
+        if (before.extensionsJson != after.extensionsJson) add("profile")
     }
 
     /** 列出全部世界书及条目数量，供助手判断新建还是追加。 */
@@ -280,29 +403,72 @@ class AssistantToolExecutor(
         if (lorebooks.isEmpty()) return "当前没有任何世界书。"
         val counts = mLorebookRepository.getLorebookEntryCounts()
         val lines = lorebooks.map { lorebook ->
-            "id=${lorebook.id}\t${lorebook.name}\t${counts[lorebook.id] ?: 0} 条"
+            val count = counts[lorebook.id] ?: 0
+            // 空书单独标出来：模型建完就忘、又建一本，最后留下满地空壳
+            val mark = if (count == 0) "（空书，没有条目）" else ""
+            "id=${lorebook.id}\t${lorebook.name}\t$count 条$mark"
         }
-        return "共 ${lorebooks.size} 本世界书：\n" + lines.joinToString("\n")
+        return "共 ${lorebooks.size} 本世界书：\n" + lines.joinToString("\n") +
+            "\n需要新建前先在这里找同名书；已经有就直接用它的 id 追加条目。"
     }
 
-    /** 新建一本空世界书，返回 ID 供后续追加条目。 */
+    /**
+     * 新建世界书，同名时复用已有那本。
+     *
+     * 之前的写法是「调一次就建一本」，模型忘了 id 或者追加条目失败重试，
+     * 就会连开好几本同名空书。现在按名字去重，重复调用只会拿到同一个 id。
+     *
+     * 同时支持一次带上 `entries`，把「建书 + 写条目」压成一次调用，
+     * 少一轮往返就少一次中途失败、少一堆只建不填的空壳。
+     */
     private suspend fun createWorldbook(arguments: JsonObject): String {
         val name = arguments.stringOrNull("name")?.trim().orEmpty()
         if (name.isBlank()) return "缺少参数 name"
-        val id = mLorebookRepository.createLorebook(name)
-        return "已创建世界书 id=$id，名称：$name"
+        val existing = mLorebookRepository.getAllLorebooks().firstOrNull { it.name == name }
+        val id: Long
+        val head: String
+        if (existing != null) {
+            id = existing.id
+            head = "已存在同名世界书「$name」（id=$id），本次未新建，直接使用这本。"
+        } else {
+            id = mLorebookRepository.createLorebook(name)
+            head = "已创建世界书 id=$id，名称：$name"
+        }
+        val entries = arguments.get("entries")?.takeIf { it.isJsonArray }?.asJsonArray ?: JsonArray()
+        if (entries.isEmpty()) {
+            return head + "\n请接着用 add_worldbook_entry 往 id=$id 里写条目；没有条目的世界书不会生效。"
+        }
+        val written = mutableListOf<String>()
+        val skipped = mutableListOf<String>()
+        entries.forEach { element ->
+            val item = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+            val entryName = item.stringOrNull("name")?.trim().orEmpty()
+            val content = item.stringOrNull("content")?.trim().orEmpty()
+            if (entryName.isBlank() || content.isBlank()) {
+                skipped += (entryName.ifBlank { "(未命名)" } + "：缺少 name 或 content")
+                return@forEach
+            }
+            writeWorldbookEntry(id, entryName, item.stringList("keys"), content)
+            written += entryName
+        }
+        return buildString {
+            append(head)
+            append("\n本次写入 ${written.size} 条：")
+            append(written.joinToString("、").ifBlank { "无" })
+            if (skipped.isNotEmpty()) {
+                append("\n跳过 ${skipped.size} 条（参数不全）：")
+                append(skipped.joinToString("；"))
+            }
+        }
     }
 
-    /** 向指定世界书追加一条条目；没有关键词时写入常驻条目。 */
-    private suspend fun addWorldbookEntry(arguments: JsonObject): String {
-        val worldbookId = arguments.longOrNull("worldbookId") ?: return "缺少参数 worldbookId"
-        val name = arguments.stringOrNull("name")?.trim().orEmpty()
-        if (name.isBlank()) return "缺少参数 name"
-        val content = arguments.stringOrNull("content")?.trim().orEmpty()
-        if (content.isBlank()) return "缺少参数 content"
-        val lorebook = mLorebookRepository.getLorebookById(worldbookId)
-            ?: return "没有 id=$worldbookId 的世界书"
-        val keys = arguments.stringList("keys")
+    /** 往世界书写入一条条目；没有关键词时按常驻条目处理。 */
+    private suspend fun writeWorldbookEntry(
+        worldbookId: Long,
+        name: String,
+        keys: List<String>,
+        content: String
+    ): Long {
         // 关键词先留空，写入后由仓库接口统一序列化，避免两处格式不一致
         val entry = LorebookEntry(
             lorebookId = worldbookId,
@@ -317,6 +483,27 @@ class AssistantToolExecutor(
         )
         val entryId = mLorebookRepository.saveEntry(entry)
         if (keys.isNotEmpty()) mLorebookRepository.updateEntryKeywords(entryId, keys)
+        return entryId
+    }
+
+    /** 向指定世界书追加一条条目；没有关键词时写入常驻条目。 */
+    private suspend fun addWorldbookEntry(arguments: JsonObject): String {
+        val worldbookId = arguments.longOrNull("worldbookId") ?: return "缺少参数 worldbookId"
+        val name = arguments.stringOrNull("name")?.trim().orEmpty()
+        if (name.isBlank()) return "缺少参数 name"
+        val content = arguments.stringOrNull("content")?.trim().orEmpty()
+        if (content.isBlank()) return "缺少参数 content"
+        val lorebook = mLorebookRepository.getLorebookById(worldbookId)
+            ?: return "没有 id=$worldbookId 的世界书"
+        val keys = arguments.stringList("keys")
+        // 同名条目已经写过就不重复灌一遍，模型重试时不会把同一段设定塞两次
+        val duplicated = mLorebookRepository.getEntriesByLorebookId(worldbookId)
+            .firstOrNull { it.name == name }
+        if (duplicated != null) {
+            return "世界书 ${lorebook.name} 里已经有同名条目「$name」（id=${duplicated.id}），" +
+                "本次未重复写入。要改内容请换一个条目名，或直接告诉用户手动编辑。"
+        }
+        writeWorldbookEntry(worldbookId, name, keys, content)
         val scope = if (keys.isEmpty()) "常驻条目" else "关键词：${keys.joinToString("、")}"
         return "已写入世界书 ${lorebook.name}：$name（$scope）"
     }
@@ -413,4 +600,23 @@ class AssistantToolExecutor(
     /** 换行符，避免在拼接里反复写转义。 */
     private fun nlLiteral(): String = "\n"
 
+}
+
+/**
+ * 读取三态布尔参数。
+ *
+ * 接受 JSON 布尔、`null`、以及 "true"/"false"/"yes"/"no"/"有"/"无"/"未设定" 这类字符串。
+ * 缺失或无法识别时返回 `null`，由调用方决定是「保持原值」还是「写回未设定」。
+ */
+private fun JsonObject.triStateOrNull(key: String): Boolean? {
+    val element = get(key) ?: return null
+    if (element.isJsonNull) return null
+    if (element.isJsonPrimitive && element.asJsonPrimitive.isBoolean) return element.asBoolean
+    val raw = runCatching { element.asString.trim().lowercase() }.getOrNull() ?: return null
+    return when (raw) {
+        "true", "yes", "y", "1", "有", "是" -> true
+        "false", "no", "n", "0", "无", "否", "没有" -> false
+        // 「未设定」与「识别不出」都当没提过，保留角色卡原值，避免把已有结论覆盖成空白
+        else -> null
+    }
 }

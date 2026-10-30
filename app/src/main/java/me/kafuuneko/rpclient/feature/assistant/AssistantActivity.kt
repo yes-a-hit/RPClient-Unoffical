@@ -26,6 +26,13 @@ class AssistantActivity : CoreActivityWithEvent() {
         if (!uris.isNullOrEmpty()) mViewModel.emit(AssistantUiIntent.AttachFiles(uris))
     }
 
+    /** 导出沙箱文件到系统「另存为」选定的位置。 */
+    private val mSandboxExporter = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*")
+    ) { uri ->
+        if (uri != null) mViewModel.emit(AssistantUiIntent.ExportSandboxFileResult(uri))
+    }
+
     override fun getViewEventFlow() = mViewModel.viewEventFlow
 
     /** 助手页发 Toast 与导入结果，文件选择与其余事件交回基类或 launcher 处理。 */
@@ -51,6 +58,11 @@ class AssistantActivity : CoreActivityWithEvent() {
                     ),
                     Toast.LENGTH_SHORT
                 ).show()
+                return
+            }
+
+            is AssistantViewEvent.OpenSandboxFileExporter -> {
+                mSandboxExporter.launch(viewEvent.fileName)
                 return
             }
         }

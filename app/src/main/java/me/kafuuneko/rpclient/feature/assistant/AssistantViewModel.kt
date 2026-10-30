@@ -514,6 +514,26 @@ class AssistantViewModel : CoreViewModelWithEvent<AssistantUiIntent, AssistantUi
         ).setup()
     }
 
+    /** 请求导出沙箱文件：记住路径，打开系统「另存为」。 */
+    @UiIntentObserver(AssistantUiIntent.ExportSandboxFile::class)
+    private fun onExportSandboxFile(intent: AssistantUiIntent.ExportSandboxFile) {
+        val state = getOrNull<AssistantUiState.Ready>() ?: return
+        val fileName = intent.path.substringAfterLast('/')
+        state.copy(pendingExportPath = intent.path).setup()
+        AssistantViewEvent.OpenSandboxFileExporter(fileName).tryEmit()
+    }
+
+    /** 系统「另存为」返回目标后，把沙箱文件写出去。 */
+    @UiIntentObserver(AssistantUiIntent.ExportSandboxFileResult::class)
+    private suspend fun onExportSandboxFileResult(intent: AssistantUiIntent.ExportSandboxFileResult) {
+        val state = getOrNull<AssistantUiState.Ready>() ?: return
+        val path = state.pendingExportPath
+        state.copy(pendingExportPath = null).setup()
+        if (path == null) return
+        val error = mStore.exportSandboxFile(path, intent.uri)
+        AssistantViewEvent.Toast(error ?: "已导出：${path.substringAfterLast('/')}").tryEmit()
+    }
+
     @UiIntentObserver(AssistantUiIntent.ClearSandbox::class)
     private suspend fun onClearSandbox() {
         val state = getOrNull<AssistantUiState.Ready>() ?: return

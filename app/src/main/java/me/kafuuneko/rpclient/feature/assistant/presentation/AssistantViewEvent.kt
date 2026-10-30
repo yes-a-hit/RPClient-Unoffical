@@ -15,4 +15,7 @@ sealed class AssistantViewEvent : IViewEvent {
         val importedCount: Int,
         val failedCount: Int
     ) : AssistantViewEvent()
+
+    /** 打开系统「另存为」选择器，导出沙箱文件。 */
+    data class OpenSandboxFileExporter(val fileName: String) : AssistantViewEvent()
 }

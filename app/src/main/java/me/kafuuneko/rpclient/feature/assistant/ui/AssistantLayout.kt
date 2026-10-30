@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.SaveAlt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import me.kafuuneko.rpclient.feature.assistant.presentation.AssistantAttachment
@@ -845,6 +846,17 @@ private fun SandboxBrowserDialog(
                                     text = formatSize(file.size),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    AssistantUiIntent.ExportSandboxFile(file.path).emit()
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Rounded.SaveAlt,
+                                    contentDescription = "导出",
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                             IconButton(

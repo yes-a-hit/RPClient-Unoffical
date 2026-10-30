@@ -144,6 +144,29 @@ class AssistantStore(private val mContext: Context) {
             .toList()
     }
 
+    /**
+     * 把沙箱里的某个文件导出到系统「另存为」选定的 URI。
+     *
+     * 助手只能在沙箱内读写，生成的世界书 / 笔记要交给用户就必须走这里：
+     * 原样复制字节，不经过文本转码，避免二进制附件被写坏。
+     *
+     * @param path 相对沙箱根的路径
+     * @param uri  系统文件选择器返回的目标 URI
+     * @return 失败时返回中文错误信息；成功返回 null
+     */
+    suspend fun exportSandboxFile(path: String, uri: Uri): String? = withContext(Dispatchers.IO) {
+        val file = File(sandboxRoot, path)
+        if (!file.isFile) return@withContext "文件不存在：$path"
+        runCatching {
+            val output = mContext.contentResolver.openOutputStream(uri)
+                ?: throw IllegalStateException("无法写入目标位置")
+            output.use { out -> file.inputStream().use { input -> input.copyTo(out) } }
+        }.fold(
+            onSuccess = { null },
+            onFailure = { "导出失败：${it.message ?: "未知错误"}" }
+        )
+    }
+
     fun sandboxSummary(): String {
         val files = sandboxRoot.walkTopDown().filter { it.isFile }.toList()
         if (files.isEmpty()) return "沙箱为空"

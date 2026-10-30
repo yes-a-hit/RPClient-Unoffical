@@ -51,7 +51,10 @@ object AssistantToolCatalog {
         "get_worldbook_entries",
         "list_scripts",
         "get_script",
-        "create_script"
+        "create_script",
+        "list_gallery",
+        "send_image",
+        "add_image_label"
     )
 
     /**
@@ -80,10 +83,10 @@ object AssistantToolCatalog {
 - `delete_file` `{"path":"a.txt"}`：删除文件。
 - `list_characters` `{}`：列出全部角色卡（含 ID、名称、描述摘要）。
 - `get_character` `{"id":1}`：读取一张角色卡的完整字段。
-- `create_character` `{"name":"角色名","description":"...","personality":"...","scenario":"...","firstMessage":"..."}`：新建一张角色卡，返回新 ID。
-- `update_character` `{"id":1,"fields":{"name":"新名字","description":"..."}}`：修改角色卡字段。
+- `create_character` `{"name":"角色名","description":"...","personality":"...","scenario":"...","firstMessage":"...","profile":{...}}`：新建一张角色卡，返回新 ID。`profile` 是可选扩展档案，字段见「角色扩展档案」小节。
+- `update_character` `{"id":1,"fields":{"name":"新名字","profile":{...}}}`：修改角色卡字段，`profile` 与现有档案逐字段合并。
 - `list_worldbooks` `{}`：列出全部世界书及其条目数量。
-- `create_worldbook` `{"name":"设定集"}`：新建一本空世界书，返回其 ID。
+- `create_worldbook` `{"name":"设定集","entries":[{"name":"条目名","keys":["关键词"],"content":"设定正文"}]}`：新建世界书；同名已存在则直接复用不重复新建，返回该 ID。`entries` 可选，带上时一次写入条目。
 - `add_worldbook_entry` `{"worldbookId":1,"name":"条目名","keys":["关键词"],"content":"设定正文"}`：向世界书追加一条条目。
 - `get_worldbook_entries` `{"worldbookId":1}`：读取某本世界书已有条目的名称与关键词。
 - `list_scripts` `{}`：列出已保存的剧本（ID、名称、场景数）。
@@ -110,8 +113,21 @@ object AssistantToolCatalog {
 - 生成后先用 `list_scripts` 确认落库，再向用户说明结局有哪几种走法。
 
 
-`update_character` 仅接受这些字段：name、description、personality、scenario、firstMessages、
-postHistoryInstructions、creatorNotes、systemPrompt。未提供的字段保持原值。
+`update_character` 的 `fields` 仅接受这些字段：name、description、personality、scenario、firstMessages、
+postHistoryInstructions、creatorNotes、systemPrompt、profile。未提供的字段保持原值。
+
+**角色扩展档案（profile）**：`create_character` 与 `update_character` 的 `profile` 对象支持这些字段，
+全部可选，没填的栏目保持空/原值：
+
+- `age`、`gender`、`occupation`、`orientation`：文本。
+- `relationshipStatus`：感情状态，取值 `unspecified`/`single`/`dating`/`married`/`divorced`/`widowed`/`complicated`。
+- `hasRomanticHistory`：是否谈过恋爱，布尔值（true/false），不清楚就省略。
+- `romanticHistory`：感情经历描述，文本。
+- `hasSexualHistory`：是否有过性经历，布尔值，不清楚就省略。
+- `sexualHistory`：性经历描述，文本。
+- `boundaries`、`likes`、`dislikes`、`extraNotes`：文本。
+
+这些是自定义扩展栏目，只在用户明确给了相关设定时填写，不要凭空臆造。
 
 把零散设定整理成世界书时，先侦察再落库：用 `read_file` 看清沙子里的内容，用 `list_worldbooks`
 确认目标是新建还是追加，逐条 `add_worldbook_entry` 写入，最后汇报写了几条、落在哪本世界书。

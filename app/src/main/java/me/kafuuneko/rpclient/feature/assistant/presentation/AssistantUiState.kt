@@ -43,8 +43,10 @@ sealed class AssistantUiState {
 
         /** Whether the sandbox browser is open. */
         val sandboxBrowserVisible: Boolean = false,
+        /** 待导出的沙箱文件路径：系统「另存为」返回后据此写入。 */
+        val pendingExportPath: String? = null,
         /** 待发送附件：选中后随下一条消息一起发出。 */
-    val attachments: List<AssistantAttachment> = emptyList()
+        val attachments: List<AssistantAttachment> = emptyList()
     ) : AssistantUiState()
 
     /** 页面结束。 */

@@ -67,6 +67,12 @@ sealed class AssistantUiIntent {
     /** 删除沙箱内的某个文件。 */
     data class DeleteSandboxFile(val path: String) : AssistantUiIntent()
 
+    /** 把沙箱内的某个文件导出到系统「另存为」选定的位置。 */
+    data class ExportSandboxFile(val path: String) : AssistantUiIntent()
+
+    /** 系统「另存为」返回了导出目标。 */
+    data class ExportSandboxFileResult(val uri: Uri) : AssistantUiIntent()
+
     /** 选择附件，随下一条消息发送。 */
     data class AttachFiles(val uris: List<Uri>) : AssistantUiIntent()
 
