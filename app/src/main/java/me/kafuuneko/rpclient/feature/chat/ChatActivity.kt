@@ -45,6 +45,13 @@ class ChatActivity : CoreActivityWithEvent() {
         uri?.let { mViewModel.emit(ChatUiIntent.ExportChatResult(it)) }
     }
 
+    /** 发送文件入口：系统文档选择器，任意类型，ViewModel 读取文本内容。 */
+    private val mFilePicker = registerForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) mViewModel.emit(ChatUiIntent.FilesPicked(uris))
+    }
+
     override fun getViewEventFlow() = mViewModel.viewEventFlow
 
     @Composable
@@ -88,6 +95,8 @@ class ChatActivity : CoreActivityWithEvent() {
                     ActivityResultContracts.PickVisualMedia.ImageOnly
                 )
             )
+
+            ChatViewEvent.OpenFilePicker -> mFilePicker.launch(arrayOf("*/*"))
 
             is ChatViewEvent.SaveImage -> mImageSaver.launch(viewEvent.metadata)
             is ChatViewEvent.CopyText -> copyText(viewEvent.text)

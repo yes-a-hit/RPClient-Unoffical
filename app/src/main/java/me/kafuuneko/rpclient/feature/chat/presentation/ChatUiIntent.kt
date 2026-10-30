@@ -39,6 +39,14 @@ sealed class ChatUiIntent {
 
     data object OpenWorldBookManager : ChatUiIntent()
 
+    data object OpenGallery : ChatUiIntent()
+
+    /** 打开系统文件选择器，把文本文件内容读进输入框发送。 */
+    data object OpenFilePicker : ChatUiIntent()
+
+    /** 文件选择器返回的 URI 列表。 */
+    data class FilesPicked(val uris: List<Uri>) : ChatUiIntent()
+
     data class ChangeSessionLorebookDialogQuery(val value: String) : ChatUiIntent()
 
     data class ToggleSessionLorebookDialogEntry(val entryId: Long) : ChatUiIntent()

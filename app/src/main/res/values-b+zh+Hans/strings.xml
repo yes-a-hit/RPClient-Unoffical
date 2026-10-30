@@ -1161,6 +1161,8 @@
     <string name="image_capability_unsupported">不支持</string>
     <string name="image_capability_hint">未知能力的模型允许尝试。图片不会被自动忽略。</string>
     <string name="attach_images">添加图片</string>
+    <string name="attach_file">发送文件</string>
+    <string name="attach_file_unsupported">仅支持读取文本文件</string>
     <string name="message_image">消息图片</string>
     <string name="image_missing">图片已丢失</string>
     <string name="image_loading">正在加载图片…</string>

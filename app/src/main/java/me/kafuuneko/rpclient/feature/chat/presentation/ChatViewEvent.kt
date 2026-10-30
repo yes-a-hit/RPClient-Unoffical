@@ -7,6 +7,8 @@ import me.kafuuneko.rpclient.libs.media.ImageExportMetadata
 sealed class ChatViewEvent : IViewEvent {
     data object PickImages : ChatViewEvent()
 
+    data object OpenFilePicker : ChatViewEvent()
+
     /** 使用原图真实类型与扩展名创建保存目标。 */
     data class SaveImage(val metadata: ImageExportMetadata) : ChatViewEvent()
 

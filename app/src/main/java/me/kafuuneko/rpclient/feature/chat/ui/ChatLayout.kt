@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Book
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -57,10 +58,13 @@ import androidx.compose.material.icons.rounded.Image as ImageIcon
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -522,6 +526,17 @@ private fun CustomChatTopBar(
                     modifier = Modifier.size(20.dp),
                     tint = if (sessionLoreDialogVisible) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                )
+            }
+            IconButton(
+                onClick = { ChatUiIntent.OpenGallery.emit() },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.PhotoLibrary,
+                    contentDescription = stringResource(R.string.gallery_title),
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
                 )
             }
             IconButton(
@@ -1403,23 +1418,45 @@ private fun ChatInputBar(
                     maxLines = 5,
                     shape = RoundedCornerShape(24.dp),
                     leadingIcon = {
-                        IconButton(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                ChatUiIntent.ImageAction(MessageImageAction.Choose(editing = false))
-                                    .emit()
-                            },
-                            enabled = !isGenerating && !imageState.processing && imageState.canAddDraft
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.ImageIcon,
-                                contentDescription = stringResource(R.string.attach_images),
-                                tint = if (!isGenerating && imageState.canAddDraft) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                                }
-                            )
+                        var menuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(
+                                onClick = { menuExpanded = true },
+                                enabled = !isGenerating && !imageState.processing && imageState.canAddDraft
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Add,
+                                    contentDescription = stringResource(R.string.attach_images),
+                                    tint = if (!isGenerating && imageState.canAddDraft) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                    }
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.attach_images)) },
+                                    leadingIcon = { Icon(Icons.Rounded.ImageIcon, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        ChatUiIntent.ImageAction(MessageImageAction.Choose(editing = false))
+                                            .emit()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.attach_file)) },
+                                    leadingIcon = { Icon(Icons.Rounded.FileUpload, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        ChatUiIntent.OpenFilePicker.emit()
+                                    }
+                                )
+                            }
                         }
                     },
                     placeholder = {

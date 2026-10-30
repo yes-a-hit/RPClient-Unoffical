@@ -1,10 +1,13 @@
 package me.kafuuneko.rpclient.feature.chat
 
 import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.viewModelScope
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +42,7 @@ import me.kafuuneko.rpclient.feature.chat.utils.toChatCharacterItem
 import me.kafuuneko.rpclient.feature.chat.utils.toChatLorebookGroupItems
 import me.kafuuneko.rpclient.feature.chat.utils.toChatMessageItems
 import me.kafuuneko.rpclient.feature.chat.utils.toChatSessionItem
+import me.kafuuneko.rpclient.feature.gallery.GalleryActivity
 import me.kafuuneko.rpclient.feature.llmproviderlist.LLMProviderListActivity
 import me.kafuuneko.rpclient.feature.main.MainActivity
 import me.kafuuneko.rpclient.feature.main.model.Route
@@ -212,6 +216,56 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             }
             else -> mImageCoordinator.handle(action)
         }
+    }
+
+    /** 打开系统文件选择器。 */
+    @UiIntentObserver(ChatUiIntent.OpenFilePicker::class)
+    private fun onOpenFilePicker() {
+        ChatViewEvent.OpenFilePicker.tryEmit()
+    }
+
+    /**
+     * 把选中的文本文件内容读进输入框草稿，作为一条可编辑的消息发送；
+     * 二进制文件（含 NUL 字节）或读取失败的文件会被跳过，全部失败时提示。
+     */
+    @UiIntentObserver(ChatUiIntent.FilesPicked::class)
+    private suspend fun onFilesPicked(intent: ChatUiIntent.FilesPicked) {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        val read = withContext(Dispatchers.IO) {
+            intent.uris.mapNotNull { readTextFileContent(it) }
+        }
+        if (read.isEmpty()) {
+            AppViewEvent.PopupToastMessage(mContext.getString(R.string.attach_file_unsupported)).tryEmit()
+            return
+        }
+        val draft = uiState.conversationState.inputDraft
+        val merged = if (draft.isBlank()) {
+            read.joinToString("\n\n")
+        } else {
+            draft + "\n\n" + read.joinToString("\n\n")
+        }
+        uiState.copy(conversationState = uiState.conversationState.copy(inputDraft = merged)).setup()
+    }
+
+    /** 读取单个文件的 UTF-8 文本（上限 512KB），二进制或失败返回 null。 */
+    private fun readTextFileContent(uri: Uri): String? = try {
+        mContext.contentResolver.openInputStream(uri)?.use { stream ->
+            val limit = 512 * 1024
+            val buffer = ByteArrayOutputStream()
+            val chunk = ByteArray(8192)
+            var total = 0
+            while (total < limit) {
+                val read = stream.read(chunk, 0, minOf(chunk.size, limit - total))
+                if (read < 0) break
+                buffer.write(chunk, 0, read)
+                total += read
+            }
+            if (total == 0) return@use null
+            val text = buffer.toString("UTF-8")
+            if (text.contains('\u0000')) null else text.trim()
+        }
+    } catch (_: Exception) {
+        null
     }
 
     private val mChatRepository by inject<ChatRepository>()
@@ -1279,6 +1333,14 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         val uiState = getOrNull<ChatUiState.Normal>() ?: return
         uiState.copy(dialogState = ChatDialogState.None).setup()
         AppViewEvent.StartActivity(WorldBookListActivity::class.java).tryEmit()
+    }
+
+    /**
+     * 跳转至相册页面。
+     */
+    @UiIntentObserver(ChatUiIntent.OpenGallery::class)
+    private fun onOpenGallery() {
+        AppViewEvent.StartActivity(GalleryActivity::class.java).tryEmit()
     }
 
     /**

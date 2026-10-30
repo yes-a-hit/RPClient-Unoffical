@@ -1180,6 +1180,8 @@
     <string name="image_capability_unsupported">Unsupported</string>
     <string name="image_capability_hint">Unknown models may be tried. Images are never silently omitted.</string>
     <string name="attach_images">Add images</string>
+    <string name="attach_file">Send file</string>
+    <string name="attach_file_unsupported">Only text files can be read</string>
     <string name="message_image">Message image</string>
     <string name="image_missing">Image missing</string>
     <string name="image_loading">Loading image…</string>
