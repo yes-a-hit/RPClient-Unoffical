@@ -1,7 +1,10 @@
 package me.kafuuneko.rpclient.feature.groupchatcreate
 
 import android.os.Bundle
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.kafuuneko.rpclient.R
 import me.kafuuneko.rpclient.feature.groupchat.GroupChatActivity
@@ -23,12 +26,15 @@ import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatLorebookEntryItem
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatLorebookGroupItem
 import me.kafuuneko.rpclient.libs.groupchat.model.toEntity
 import me.kafuuneko.rpclient.libs.prompt.resolveCharacterUserMacros
+import me.kafuuneko.rpclient.libs.room.entity.Character
 import me.kafuuneko.rpclient.libs.room.repository.CharacterRepository
+import me.kafuuneko.rpclient.libs.room.repository.FileRepository
 import me.kafuuneko.rpclient.libs.room.repository.GroupChatRepository
 import me.kafuuneko.rpclient.libs.room.repository.LorebookRepository
 import me.kafuuneko.rpclient.utils.toggle
 import me.kafuuneko.rpclient.utils.toggleAll
 import me.kafuuneko.rpclient.utils.toDefaultChatTitle
+import me.kafuuneko.rpclient.ui.theme.CharacterAccentColors
 import me.kafuuneko.rpclient.utils.filterLorebookGroups
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -51,6 +57,8 @@ class GroupChatCreateViewModel :
     private val mGroupChatRepository by inject<GroupChatRepository>()
     private val mLorebookRepository by inject<LorebookRepository>()
     private val mGreetingPlanner by inject<GroupChatGreetingPlanner>()
+    private val mFileRepository by inject<FileRepository>()
+    private var mCharactersById: Map<Long, Character> = emptyMap()
 
     /** 初始化页面，拉取候选角色列表与世界书条目列表。 */
     @UiIntentObserver(GroupChatCreateUiIntent.Init::class)
@@ -62,7 +70,9 @@ class GroupChatCreateViewModel :
         val userName = AppModel.resolvedUserName
         // 在 IO 线程并发查询候选角色与带条目的世界书分组
         val data = withContext(Dispatchers.IO) {
-            val characters = mCharacterRepository.getAllCharacters().map {
+            val rawCharacters = mCharacterRepository.getAllCharacters()
+            mCharactersById = rawCharacters.associateBy { it.id }
+            val characters = rawCharacters.map {
                 GroupChatCreateCharacterItem(
                     id = it.id,
                     name = it.name,
@@ -73,7 +83,11 @@ class GroupChatCreateViewModel :
                     ),
                     selected = false,
                     characterLorebookId = it.characterLorebookId,
-                    greetings = it.getChatFirstMessageList()
+                    greetings = it.getChatFirstMessageList(),
+                    avatarText = it.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    avatarColor = CharacterAccentColors[
+                        (it.id % CharacterAccentColors.size).toInt()
+                    ]
                 )
             }
             val lorebookGroups = mLorebookRepository.getAllLorebooksWithEntries()
@@ -110,6 +124,8 @@ class GroupChatCreateViewModel :
             lorebookGroups = data.second,
             visibleLorebookGroups = data.second
         ).setup()
+        // 头像解码放后台，页面先用文字头像立即可见
+        loadCharacterAvatars()
     }
 
     /** 处理返回操作，迁移至 Finished 状态。 */
@@ -447,5 +463,38 @@ class GroupChatCreateViewModel :
             )
             GroupChatGreetingMode.None -> GroupChatGreetingSelection.None
         }
+    }
+
+    /**
+     * 后台解码角色头像。
+     *
+     * 创建页一次最多展示几十个角色，不需要角色列表那套可见性驱动的 LRU 重活；
+     * 这里逐张解码、逐张发布，点开页面时先看到文字头像，图片随后填上。
+     */
+    private fun loadCharacterAvatars() {
+        val current = getOrNull<GroupChatCreateUiState.Normal>() ?: return
+        val pending = current.characters.filter { it.avatarImage == null }
+        if (pending.isEmpty()) return
+        viewModelScope.launch {
+            pending.forEach { item ->
+                val uuid = mCharactersById[item.id]?.avatar.orEmpty()
+                if (uuid.isBlank()) return@forEach
+                val bitmap = withContext(Dispatchers.IO) {
+                    mFileRepository.loadSampledBitmap(uuid, AVATAR_TARGET_PX, AVATAR_TARGET_PX)
+                } ?: return@forEach
+                val image = bitmap.asImageBitmap()
+                val latest = getOrNull<GroupChatCreateUiState.Normal>() ?: return@launch
+                latest.copy(
+                    characters = latest.characters.map {
+                        if (it.id == item.id) it.copy(avatarImage = image) else it
+                    }
+                ).setup()
+            }
+        }
+    }
+
+    private companion object {
+        /** 头像在列表里的展示边长（dp 约 46）折算后的采样尺寸。 */
+        const val AVATAR_TARGET_PX = 144
     }
 }

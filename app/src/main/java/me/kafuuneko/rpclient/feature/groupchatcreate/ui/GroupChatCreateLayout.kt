@@ -56,7 +56,6 @@ import me.kafuuneko.rpclient.feature.groupchatcreate.presentation.GroupChatCreat
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatActivationStrategy
 import me.kafuuneko.rpclient.ui.widgets.groupchat.GroupChatLorebookSelector
 import me.kafuuneko.rpclient.libs.core.ActivityPreview
-import me.kafuuneko.rpclient.ui.theme.getMacaronColor
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
 import me.kafuuneko.rpclient.ui.widgets.RpAvatar
 import me.kafuuneko.rpclient.ui.widgets.RpPageTitle
@@ -515,7 +514,6 @@ private fun CharacterChoiceCard(
     character: GroupChatCreateCharacterItem,
     onClick: () -> Unit
 ) {
-    val accent = getMacaronColor(character.name)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -542,8 +540,9 @@ private fun CharacterChoiceCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             RpAvatar(
-                text = character.name.firstOrNull()?.uppercase() ?: "?",
-                color = accent
+                text = character.avatarText,
+                color = character.avatarColor,
+                image = character.avatarImage
             )
             Column(
                 modifier = Modifier
