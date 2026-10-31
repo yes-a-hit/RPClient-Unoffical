@@ -1,5 +1,6 @@
 package me.kafuuneko.rpclient.feature.groupchat.presentation
 
+import android.net.Uri
 import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatActivationStrategy
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatCharacterCardMode
@@ -11,6 +12,10 @@ sealed class GroupChatUiIntent {
 
     data object RetryImageReply : GroupChatUiIntent()
     data class ImageAction(val action: MessageImageAction) : GroupChatUiIntent()
+    /** 打开系统文件选择器，读取文本文件内容填入输入框。 */
+    data object OpenFilePicker : GroupChatUiIntent()
+    /** 文件选择器返回的已选文件。 */
+    data class FilesPicked(val uris: List<Uri>) : GroupChatUiIntent()
     data class Init(val sessionId: String?) : GroupChatUiIntent()
     data object Resume : GroupChatUiIntent()
     data object LoadOlderMessages : GroupChatUiIntent()

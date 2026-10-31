@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.Book
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Place
@@ -258,6 +259,7 @@ private fun GroupChatNormalView(
                     onSend = { emitIntent(GroupChatUiIntent.SendMessage) },
                     onStop = { emitIntent(GroupChatUiIntent.StopGeneration) },
                     onImageAction = { emitIntent(GroupChatUiIntent.ImageAction(it)) },
+                    onOpenFilePicker = { emitIntent(GroupChatUiIntent.OpenFilePicker) },
                     canContinue = canContinue,
                     onContinue = { emitIntent(GroupChatUiIntent.ContinueLast) },
                     onSummarize = { emitIntent(GroupChatUiIntent.SummarizeNow) },
@@ -2027,6 +2029,7 @@ private fun Composer(
     onSend: () -> Unit,
     onStop: () -> Unit,
     onImageAction: (MessageImageAction) -> Unit,
+    onOpenFilePicker: () -> Unit,
     canContinue: Boolean,
     onContinue: () -> Unit,
     onSummarize: () -> Unit,
@@ -2104,22 +2107,56 @@ private fun Composer(
                     shape = RoundedCornerShape(18.dp),
                     maxLines = 5,
                     leadingIcon = {
-                        IconButton(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onImageAction(MessageImageAction.Choose(editing = false))
-                            },
-                            enabled = !generating && !imageState.processing && imageState.canAddDraft
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.ImageIcon,
-                                contentDescription = stringResource(R.string.attach_images),
-                                tint = if (!generating && imageState.canAddDraft) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                                }
-                            )
+                        var menuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(
+                                onClick = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    menuExpanded = true
+                                },
+                                enabled = !generating && !imageState.processing && imageState.canAddDraft
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Add,
+                                    contentDescription = stringResource(R.string.attach_images),
+                                    tint = if (!generating && imageState.canAddDraft) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                    }
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.attach_images)) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.ImageIcon,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onImageAction(MessageImageAction.Choose(editing = false))
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.attach_file)) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.FileUpload,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onOpenFilePicker()
+                                    }
+                                )
+                            }
                         }
                     }
                 )

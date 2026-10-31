@@ -1,7 +1,9 @@
 package me.kafuuneko.rpclient.feature.groupchat
 
 import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import java.io.ByteArrayOutputStream
 import androidx.lifecycle.viewModelScope
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
@@ -221,6 +223,51 @@ class GroupChatViewModel :
             }
             else -> mImageCoordinator.handle(action)
         }
+    }
+
+    /** 打开系统文件选择器，读取文本文件内容填入输入框。 */
+    @UiIntentObserver(GroupChatUiIntent.OpenFilePicker::class)
+    private fun onOpenFilePicker() {
+        GroupChatViewEvent.OpenFilePicker.tryEmit()
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.FilesPicked::class)
+    private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        val chunks = withContext(Dispatchers.IO) {
+            intent.uris.mapNotNull { uri -> readTextFileContent(uri) }
+        }
+        if (chunks.isEmpty()) {
+            AppViewEvent.PopupToastMessage(
+                mContext.getString(R.string.attach_file_unsupported)
+            ).tryEmit()
+            return
+        }
+        val merged = (uiState.conversationState.inputDraft.trim() + "\n\n" +
+            chunks.joinToString("\n\n")).trim()
+        uiState.copy(
+            conversationState = uiState.conversationState.copy(inputDraft = merged)
+        ).setup()
+    }
+
+    /** 读取文本文件内容；二进制或空文件返回 null。 */
+    private suspend fun readTextFileContent(uri: Uri): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            mContext.contentResolver.openInputStream(uri)?.use { input ->
+                val buffer = ByteArrayOutputStream()
+                val bytes = ByteArray(8192)
+                var total = 0
+                while (true) {
+                    val read = input.read(bytes)
+                    if (read < 0) break
+                    total += read
+                    if (total > 512 * 1024) break
+                    buffer.write(bytes, 0, read)
+                }
+                val content = buffer.toString("UTF-8")
+                if (content.isBlank() || content.contains('\u0000')) null else content.trim()
+            }
+        }.getOrNull()
     }
 
     private val mGroupChatRepository by inject<GroupChatRepository>()
@@ -2564,6 +2611,11 @@ class GroupChatViewModel :
         val data = pageData.data
         mMessageDisplayContext = data.copy(messages = emptyList())
         mOldestLoadedMessageCursor = data.messages.firstOrNull()?.toGroupChatMessageCursor()
+        // 顶栏与成员列表需要真实头像：loadState 在 IO 线程执行，直接同步解码并复用缓存
+        val avatarByCharacterId = HashMap<Long, ImageBitmap?>()
+        for (member in data.members) {
+            avatarByCharacterId[member.character.id] = loadAvatarImage(member.character.avatar)
+        }
         val members = data.members.map {
             GroupChatMemberItem(
                 id = it.character.id,
@@ -2573,7 +2625,8 @@ class GroupChatViewModel :
                     characterName = it.character.name,
                     userName = data.session.userName
                 ),
-                muted = it.relation.muted
+                muted = it.relation.muted,
+                avatarImage = avatarByCharacterId[it.character.id]
             )
         }
         // 计算当前激活策略下的有效选中发言人

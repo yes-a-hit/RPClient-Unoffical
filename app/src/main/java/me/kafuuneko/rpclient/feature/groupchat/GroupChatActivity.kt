@@ -31,6 +31,9 @@ class GroupChatActivity : CoreActivityWithEvent() {
     private val mImageSaver = registerForActivityResult(
         CreateImageDocumentContract()
     ) { uri -> uri?.let { mViewModel.emit(GroupChatUiIntent.ImageAction(MessageImageAction.SaveResult(it))) } }
+    private val mFilePicker = registerForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> if (uris.isNotEmpty()) mViewModel.emit(GroupChatUiIntent.FilesPicked(uris)) }
 
 
     override fun getViewEventFlow() = mViewModel.viewEventFlow
@@ -70,6 +73,7 @@ class GroupChatActivity : CoreActivityWithEvent() {
         when (viewEvent) {
             GroupChatViewEvent.PickImages -> mImagePicker.launch(PickVisualMediaRequest(
                 ActivityResultContracts.PickVisualMedia.ImageOnly))
+            GroupChatViewEvent.OpenFilePicker -> mFilePicker.launch(arrayOf("*/*"))
             is GroupChatViewEvent.SaveImage -> mImageSaver.launch(viewEvent.metadata)
             is GroupChatViewEvent.CopyText -> copyText(viewEvent.text)
             else -> super.onReceivedViewEvent(viewEvent)
