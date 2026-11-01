@@ -1,4 +1,4 @@
-﻿<#
+<#
   Launch the RPClient AVD and pin its window inside the visible desktop.
 
   Why this exists: the emulator keeps its last window geometry and sizes the
@@ -30,7 +30,9 @@ param(
     # 客户机内存上限。给太多没意义，给太少起不来，2 GB 足够跑这个应用。
     [int]$MemoryMb = 2048,
     # 低于这个可用内存就不启动，免得和构建、浏览器一起把机器拖死。
-    [int]$MinFreeGb = 6
+    [int]$MinFreeGb = 6,
+    # 明知 java 在跑还要起模拟器时打开这个开关。默认拦住，因为并发跑死过机。
+    [switch]$AllowJava
 )
 
 # adb prints routine state transitions to stderr, so native failures must not
@@ -43,10 +45,14 @@ $freeGb = [math]::Round($osInfo.FreePhysicalMemory / 1MB, 1)
 if ($freeGb -lt $MinFreeGb) {
     throw "可用内存只有 ${freeGb} GB，低于阈值 ${MinFreeGb} GB。先关掉占内存的程序，或用 -MinFreeGb 调低阈值。"
 }
-# 构建和模拟器同时跑是死机的典型组合，提醒一句而不是直接拦住。
+# 构建和模拟器同时跑是死机的典型组合。这条原来是 Write-Warning，看着像提醒、
+# 实际拦不住人——2026-11-01 23:16 就是在 java 还在跑的时候强行起模拟器，
+# 五分钟内整机 hang 死重启。警告没人听，就换成硬失败。
 $busyJava = Get-Process -Name 'java' -ErrorAction SilentlyContinue
-if ($busyJava) {
-    Write-Warning "检测到 java 进程（可能是 Gradle 构建）。构建与模拟器同时跑容易拖死系统，建议分开。"
+if ($busyJava -and -not $AllowJava) {
+    throw ("检测到 " + $busyJava.Count + " 个 java 进程（通常是 Gradle 构建）。" +
+        "构建与模拟器同时跑会把机器拖死，先等构建结束再启模拟器；" +
+        "确认无害可以用 -AllowJava 跳过这一拦。")
 }
 "free memory ${freeGb} GB, launching with -gpu $Gpu -memory $MemoryMb"
 
