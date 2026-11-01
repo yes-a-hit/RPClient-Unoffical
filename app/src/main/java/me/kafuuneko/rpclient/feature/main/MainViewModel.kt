@@ -113,6 +113,7 @@ import me.kafuuneko.rpclient.libs.room.repository.StoryRepository
 import me.kafuuneko.rpclient.libs.theme.AppThemeManager
 import me.kafuuneko.rpclient.utils.formatTimestamp
 import me.kafuuneko.rpclient.utils.stripThinkBlocks
+import me.kafuuneko.rpclient.utils.toPreview
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -2071,7 +2072,9 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
      * @return 首页会话预览文案。
      */
     private fun messagePreview(content: String?, hasImages: Boolean): String =
-        content?.stripThinkBlocks()?.takeIf { it.isNotBlank() }
+        // maxLines 只限制显示行数，测量前仍需限制传给 Text 的正文长度：
+        // 一段几万字的回复会把布局测量拖住，正是 ANR 报告里的那类卡顿。
+        content?.stripThinkBlocks()?.takeIf { it.isNotBlank() }?.toPreview(maxLength = 512)
             ?: mContext.getString(if (hasImages) R.string.message_image else R.string.no_messages_yet)
 
     /** 将 ChatSessionOverview 转换为首页单聊列表项展示模型。 */
