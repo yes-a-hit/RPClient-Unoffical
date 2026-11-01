@@ -2170,7 +2170,7 @@ private fun Composer(
                                 )
                                 // 从图库挑：图已经导进来、也分好类了，聊天里得能直接用。
                                 DropdownMenuItem(
-                                    text = { Text("从图库选") },
+                                    text = { Text(stringResource(R.string.gallery_pick_from_library)) },
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Rounded.PhotoLibrary,

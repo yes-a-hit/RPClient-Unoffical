@@ -1518,4 +1518,5 @@
     <string name="group_chat_scene_empty_hint">还没配过场景。加一个就能把同一个群聊分成不同地点，每个地点只让在场的人发言。</string>
     <string name="group_chat_scene_all_present">全员在场</string>
     <string name="group_chat_scene_nobody">还没有人</string>
+    <string name="gallery_pick_from_library">从图库选</string>
 </resources>

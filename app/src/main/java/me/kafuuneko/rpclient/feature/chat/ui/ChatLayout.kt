@@ -1468,7 +1468,7 @@ private fun ChatInputBar(
                                 // 从图库挑：图已经导进来、也分好类了，聊天里得能直接用，
                                 // 不然每次都要先去图库复制一遍再回相册翻。
                                 DropdownMenuItem(
-                                    text = { Text("从图库选") },
+                                    text = { Text(stringResource(R.string.gallery_pick_from_library)) },
                                     leadingIcon = { Icon(Icons.Rounded.PhotoLibrary, contentDescription = null) },
                                     onClick = {
                                         menuExpanded = false

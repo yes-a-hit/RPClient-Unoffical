@@ -265,9 +265,74 @@ class AppDatabaseMigrationTest {
         }
     }
 
+    /**
+     * 5→6 是手写迁移，必须同时接受两种来源库：标准 v5（缺场景两列）和历史上那个
+     * 结构不同却同样声明成 v5 的库（两列已经在）。前者靠 ALTER 补齐，后者必须静默跳过
+     * ——这正是自动迁移栽掉的地方。
+     */
+    @Test
+    fun migrate5To6_addsSceneColumnsAndToleratesAlreadyPresent() {
+        migrationHelper.createDatabase(SceneDatabaseName, 5).apply {
+            execSQL(
+                """
+                INSERT INTO group_chat_sessions (
+                    id, title, createTime, latestTime, userName, userDescription, scenario,
+                    userNote, lorebookEntrySet, worldInfoStateJson, systemPromptOverride,
+                    groupNudgePromptOverride, newGroupChatPromptOverride, activationStrategy,
+                    allowSelfResponses, characterCardMode, includeMutedCards, autoModeEnabled,
+                    trimOtherSpeakers, autoSummaryPaused
+                ) VALUES (701, 'legacy', 1, 2, 'user', '', '', '', '[]', '{}', '', '', '',
+                    'Natural', 1, 'All', 0, 0, 0, 0)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(SceneDatabaseName, 6, true)
+
+        migrated.query(
+            "SELECT scenesJson, activeSceneId FROM group_chat_sessions WHERE id = 701"
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("[]", cursor.getString(0))
+            assertEquals("", cursor.getString(1))
+        }
+
+        // 第二种来源：v5 里这两列已经存在（来自带场景功能的构建）。
+        val patched = "app-scene-already-present-migration-test"
+        migrationHelper.createDatabase(patched, 5).apply {
+            execSQL("ALTER TABLE group_chat_sessions ADD COLUMN scenesJson TEXT NOT NULL DEFAULT '[]'")
+            execSQL("ALTER TABLE group_chat_sessions ADD COLUMN activeSceneId TEXT NOT NULL DEFAULT ''")
+            execSQL(
+                """
+                INSERT INTO group_chat_sessions (
+                    id, title, createTime, latestTime, userName, userDescription, scenario,
+                    userNote, lorebookEntrySet, worldInfoStateJson, systemPromptOverride,
+                    groupNudgePromptOverride, newGroupChatPromptOverride, activationStrategy,
+                    allowSelfResponses, characterCardMode, includeMutedCards, autoModeEnabled,
+                    trimOtherSpeakers, autoSummaryPaused, scenesJson, activeSceneId
+                ) VALUES (702, 'patched', 1, 2, 'user', '', '', '', '[]', '{}', '', '', '',
+                    'Natural', 1, 'All', 0, 0, 0, 0,
+                    '[{"id":"kitchen","name":"厨房"}]', 'kitchen')
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val alreadyPresent = migrationHelper.runMigrationsAndValidate(patched, 6, true)
+        alreadyPresent.query(
+            "SELECT scenesJson, activeSceneId FROM group_chat_sessions WHERE id = 702"
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("[{\"id\":\"kitchen\",\"name\":\"厨房\"}]", cursor.getString(0))
+            assertEquals("kitchen", cursor.getString(1))
+        }
+    }
+
     private companion object {
         const val DatabaseName = "app-migration-test"
         const val RegexDatabaseName = "app-regex-migration-test"
         const val TokenUsageDatabaseName = "app-token-usage-migration-test"
+        const val SceneDatabaseName = "app-scene-migration-test"
     }
 }

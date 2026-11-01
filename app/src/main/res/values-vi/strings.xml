@@ -1524,4 +1524,5 @@ Mở Cài đặt mô hình để kiểm tra khóa API, URL cơ sở, tên mô h�
     <string name="group_chat_scene_empty_hint">No scenes yet. Add one to split this group into places; only those present speak.</string>
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
+    <string name="gallery_pick_from_library">Chọn từ thư viện</string>
 </resources>

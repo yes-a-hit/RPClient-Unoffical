@@ -1,4 +1,4 @@
-﻿package me.kafuuneko.rpclient.libs.room
+package me.kafuuneko.rpclient.libs.room
 
 import androidx.room.AutoMigration
 import androidx.room.Database
@@ -79,8 +79,9 @@ import me.kafuuneko.rpclient.libs.room.migration.AppDatabaseAutoMigration3To4Spe
         AutoMigration(from = 1, to = 2, spec = AppDatabaseAutoMigration1To2Spec::class),
         AutoMigration(from = 2, to = 3, spec = AppDatabaseAutoMigration2To3Spec::class),
         AutoMigration(from = 3, to = 4, spec = AppDatabaseAutoMigration3To4Spec::class),
-        AutoMigration(from = 4, to = 5),
-        AutoMigration(from = 5, to = 6)
+        AutoMigration(from = 4, to = 5)
+        // 5→6 改为手写 Migration（AppDatabaseMigration5To6）：库里存在两个结构不同却都叫
+        // version 5 的历史版本，自动迁移只看版本号会跳过列检查，导致那批库升级后打不开。
     ],
     exportSchema = true
 )

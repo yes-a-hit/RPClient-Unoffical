@@ -1518,4 +1518,5 @@
     <string name="group_chat_scene_empty_hint">No scenes yet. Add one to split this group into places; only those present speak.</string>
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
+    <string name="gallery_pick_from_library">라이브러리에서 선택</string>
 </resources>
