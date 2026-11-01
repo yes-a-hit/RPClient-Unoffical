@@ -2432,8 +2432,9 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         // 角色本人的样子：给模型一个视觉锚点，
         // 用户发同形象的梗图时才认得出画里那个是自己
         val appearance = withContext(Dispatchers.IO) {
-            mGalleryStore.appearanceImages(character.name).mapNotNull { image ->
-                mImageRuntime.referenceOf(image.fileUuid)?.let { ref ->
+            mGalleryStore.appearanceImages(character.name).flatMap { image ->
+                // 立绘或动作插图可能是 GIF，展开成多帧再送，别只给头帧
+                mImageRuntime.referencesOf(image.fileUuid).map { ref ->
                     ref to image.appearanceNote
                 }
             }

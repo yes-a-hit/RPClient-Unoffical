@@ -56,6 +56,7 @@ class AssistantViewModel : CoreViewModelWithEvent<AssistantUiIntent, AssistantUi
     private val mClientFactory by inject<LLMClientFactory>()
     private val mFileRepository by inject<FileRepository>()
     private val mGalleryStore by inject<me.kafuuneko.rpclient.libs.gallery.GalleryStore>()
+    private val mImageRuntime by inject<me.kafuuneko.rpclient.libs.media.MessageImageRuntime>()
     private val mContext by inject<android.content.Context>()
 
     /** 当前会话 ID；空表示尚未确定，首次加载时创建或选取最新会话。 */
@@ -321,10 +322,13 @@ class AssistantViewModel : CoreViewModelWithEvent<AssistantUiIntent, AssistantUi
         }
         mPendingImages = attachments
             .filter { it.isImage }
-            .mapNotNull { attachment ->
+            .flatMap { attachment ->
                 runCatching {
                     mFileRepository.saveFile(Uri.parse(attachment.uri))
-                }.getOrNull()?.let { uuid -> buildImageReference(uuid) }
+                }.getOrNull()?.let { uuid ->
+                    // 走统一的引用解析：GIF 在这里被抽成多帧，不会把动图原样甩给端点
+                    mImageRuntime.referencesOf(uuid)
+                }.orEmpty()
             }
         return PreparedPayload(textParts.joinToString(nlLiteral().repeat(2)))
     }

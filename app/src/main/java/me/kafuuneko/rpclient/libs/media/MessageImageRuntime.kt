@@ -3,7 +3,10 @@ package me.kafuuneko.rpclient.libs.media
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Movie
 import android.net.Uri
 import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
@@ -140,11 +143,11 @@ class MessageImageRuntime(
     /** 只归类明确资源 IO 错误；协程取消和未知程序错误继续传播。 */
     private suspend fun prepareAttachment(
         attachment: MessageImageWithFile
-    ): LLMImageReference {
+    ): List<LLMImageReference> {
         val index = attachment.file ?: throw ImageRequestException(ImageRequestFailure.Missing)
         return try {
             mFiles.withFileLease(index.uuid) { original ->
-                describe(index.uuid, original)
+                describeAll(index.uuid, original)
             }
         } catch (error: IOException) {
             currentCoroutineContext().ensureActive()
@@ -180,6 +183,20 @@ class MessageImageRuntime(
         runCatching {
             mFiles.withFileLease(uuid) { file -> describe(uuid, file) }
         }.getOrNull()
+    }
+
+    /**
+     * 按文件 UUID 取全部发送引用，GIF 会展开成多帧。
+     *
+     * 用于角色外观参考这类「不在消息里但要随 Prompt 送出去」的图片。
+     * 与 [referenceOf] 的差别只有一个：动图不会只给头帧。
+     *
+     * @return 文件缺失或不可发送时返回空列表，由调用方跳过这一张。
+     */
+    suspend fun referencesOf(uuid: String): List<LLMImageReference> = withContext(Dispatchers.IO) {
+        runCatching {
+            mFiles.withFileLease(uuid) { file -> describeAll(uuid, file) }
+        }.getOrDefault(emptyList())
     }
 
     /**
@@ -322,6 +339,92 @@ class MessageImageRuntime(
             if (swap) bounds.outWidth else bounds.outHeight, file.length())
     }
 
+    /**
+     * 读取一张图片在请求里的全部引用。
+     *
+     * 静态图就是它自己一条；GIF 会被抽成若干静态帧，每帧单独入库并各占一条引用。
+     * 抽帧而不是报错，是因为多数模型端点不接受 `image/gif`，但「这张动图讲了个什么故事」
+     * 恰恰是用户最想让它看明白的东西——直接拒绝等于把这类输入整个丢掉。
+     *
+     * @param uuid 仓库中的原文件 UUID
+     * @param file 原文件
+     * @return 按时间顺序排列的引用；GIF 无有效帧时抛 [ImageRequestFailure.InvalidImage]
+     */
+    private suspend fun describeAll(uuid: String, file: File): List<LLMImageReference> {
+        val bounds = bounds(file)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            throw ImageRequestException(ImageRequestFailure.InvalidImage)
+        }
+        if (bounds.outMimeType != "image/gif") {
+            validateSendable(file)
+            return listOf(describe(uuid, file))
+        }
+        return expandAnimated(file)
+    }
+
+    /**
+     * 把 GIF 抽成若干静态帧并入库。
+     *
+     * 用 [Movie] 按时间轴取帧，而不是 [BitmapFactory]——后者只会给出第一帧，
+     * 模型看到的就永远是开场画面，动图后半段表达的动作完全丢失。
+     *
+     * 帧数固定为 [GIF_SAMPLE_FRAMES]，均匀铺满整个时长；单帧长边限制到发送尺寸，
+     * 避免一张动图把视觉 token 预算一口气吃光。
+     */
+    private suspend fun expandAnimated(file: File): List<LLMImageReference> {
+        val movie = file.inputStream().use { Movie.decodeStream(it) }
+            ?: throw ImageRequestException(ImageRequestFailure.InvalidImage)
+        val width = movie.width()
+        val height = movie.height()
+        if (width <= 0 || height <= 0) throw ImageRequestException(ImageRequestFailure.InvalidImage)
+        val duration = movie.duration().coerceAtLeast(0)
+        // 时长为 0 表示单帧 GIF 或缺失帧延迟信息，此时只取开头一帧
+        val times = if (duration <= 0) listOf(0)
+        else List(GIF_SAMPLE_FRAMES) { index -> duration * index / GIF_SAMPLE_FRAMES }
+        val edge = MessageImagePolicy.SEND_LONG_EDGE
+        val scale = if (maxOf(width, height) > edge) edge.toFloat() / maxOf(width, height) else 1f
+        val targetWidth = (width * scale).roundToInt().coerceAtLeast(1)
+        val targetHeight = (height * scale).roundToInt().coerceAtLeast(1)
+        val references = mutableListOf<LLMImageReference>()
+        for (time in times) {
+            currentCoroutineContext().ensureActive()
+            val frame = renderFrame(movie, time, targetWidth, targetHeight)
+                ?: continue
+            val temp = File.createTempFile("gif-frame-", ".png", mContext.cacheDir)
+            try {
+                FileOutputStream(temp).use { output ->
+                    if (!frame.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                        throw ImageRequestException(ImageRequestFailure.InvalidImage)
+                    }
+                }
+            } finally {
+                frame.recycle()
+            }
+            try {
+                // 每帧单独入库，下游按 UUID 取文件转 Base64 的链路完全不用改
+                val frameUuid = mFiles.saveFile(temp, "image/png")
+                references += LLMImageReference(
+                    frameUuid, "image/png", targetWidth, targetHeight, temp.length()
+                )
+            } finally {
+                temp.delete()
+            }
+        }
+        if (references.isEmpty()) throw ImageRequestException(ImageRequestFailure.InvalidImage)
+        return references
+    }
+
+    /** 在指定时间点把 [Movie] 的一帧画到 ARGB 位图上。 */
+    private fun renderFrame(movie: Movie, time: Int, width: Int, height: Int): Bitmap? {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.TRANSPARENT)
+        movie.setTime(time)
+        canvas.scale(width.toFloat() / movie.width(), height.toFloat() / movie.height())
+        movie.draw(canvas, 0f, 0f)
+        return bitmap
+    }
+
     /** 原图模式与历史读取共用协议支持范围，禁止发送不支持或超过硬上限的文件。 */
     private fun validateSendable(file: File) {
         val bounds = bounds(file)
@@ -374,7 +477,13 @@ class MessageImageRuntime(
         val bounds = bounds(file)
         requireValidImage(bounds.outWidth > 0 && bounds.outHeight > 0)
         requireValidImage(bounds.outWidth.toLong() * bounds.outHeight <= MessageImagePolicy.MAX_ORIGINAL_PIXELS)
-        requireValidImage(bounds.outMimeType in setOf("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"))
+        // GIF 单独放行：动图由 [expandAnimated] 抽成静态帧后再送模型，
+        // 原文件本身不进请求，所以不会把「动图」这个概念漏给不支持它的端点。
+        requireValidImage(
+            bounds.outMimeType in setOf(
+                "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif"
+            )
+        )
         // PNG / WebP 按容器块跳转检查动画标记，不将压缩像素误识别成块头。
         RandomAccessFile(file, "r").use { input ->
             var offset = if (bounds.outMimeType == "image/png") 8L else 12L
@@ -431,5 +540,15 @@ class MessageImageRuntime(
         )
         if (scaled !== bitmap) bitmap.recycle()
         return scaled
+    }
+
+    private companion object {
+        /**
+         * GIF 抽帧数量。
+         *
+         * 取 3 帧是「看得出在动」与「别把视觉预算吃光」之间的折中：
+         * 1 帧等于没看懂动图，帧数再多模型也只会描述重复画面。
+         */
+        const val GIF_SAMPLE_FRAMES = 3
     }
 }

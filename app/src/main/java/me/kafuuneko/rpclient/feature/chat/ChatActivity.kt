@@ -27,7 +27,9 @@ import me.kafuuneko.rpclient.libs.core.IViewEvent
 class ChatActivity : CoreActivityWithEvent() {
     private val mViewModel by viewModels<ChatViewModel>()
     private val mImagePicker = registerForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(4)
+        // 与群聊保持一致：用系统文件/相册选择器，能进相册目录、能选 GIF。
+        // Photo Picker 只给一条照片流，选图只能一张张划。
+        ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         mViewModel.emit(ChatUiIntent.ImageAction(MessageImageAction.Picked(uris)))
     }
@@ -90,11 +92,7 @@ class ChatActivity : CoreActivityWithEvent() {
     override suspend fun onReceivedViewEvent(viewEvent: IViewEvent) {
         // 图片保存使用本次原图的格式元数据，其他导出沿用各自的文档合约。
         when (viewEvent) {
-            ChatViewEvent.PickImages -> mImagePicker.launch(
-                PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly
-                )
-            )
+            ChatViewEvent.PickImages -> mImagePicker.launch(arrayOf("image/*"))
 
             ChatViewEvent.OpenFilePicker -> mFilePicker.launch(arrayOf("*/*"))
 

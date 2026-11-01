@@ -26,7 +26,11 @@ import me.kafuuneko.rpclient.libs.core.IViewEvent
 class GroupChatActivity : CoreActivityWithEvent() {
     private val mViewModel by viewModels<GroupChatViewModel>()
     private val mImagePicker = registerForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(4)
+        // 走系统文件/相册选择器而不是 Photo Picker：
+        // Photo Picker 只给一条照片流，用户没法点进「相册」目录挑图，
+        // 也没法选 GIF —— 只能一张张划。这里换成 OpenMultipleDocuments，
+        // 系统会给出完整的相册/文件夹导航。
+        ActivityResultContracts.OpenMultipleDocuments()
     ) { uris -> mViewModel.emit(GroupChatUiIntent.ImageAction(MessageImageAction.Picked(uris))) }
     private val mImageSaver = registerForActivityResult(
         CreateImageDocumentContract()
@@ -71,8 +75,7 @@ class GroupChatActivity : CoreActivityWithEvent() {
      */
     override suspend fun onReceivedViewEvent(viewEvent: IViewEvent) {
         when (viewEvent) {
-            GroupChatViewEvent.PickImages -> mImagePicker.launch(PickVisualMediaRequest(
-                ActivityResultContracts.PickVisualMedia.ImageOnly))
+            GroupChatViewEvent.PickImages -> mImagePicker.launch(arrayOf("image/*"))
             GroupChatViewEvent.OpenFilePicker -> mFilePicker.launch(arrayOf("*/*"))
             is GroupChatViewEvent.SaveImage -> mImageSaver.launch(viewEvent.metadata)
             is GroupChatViewEvent.CopyText -> copyText(viewEvent.text)
