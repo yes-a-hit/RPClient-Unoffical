@@ -224,6 +224,28 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         ChatViewEvent.OpenFilePicker.tryEmit()
     }
 
+    /** 打开图库挑选对话框：从已导入的图片里挑，不经过系统相册。 */
+    @UiIntentObserver(ChatUiIntent.OpenGalleryPicker::class)
+    private fun onOpenGalleryPicker() {
+        getOrNull<ChatUiState.Normal>()?.copy(galleryPickerVisible = true)?.setup()
+    }
+
+    @UiIntentObserver(ChatUiIntent.CloseGalleryPicker::class)
+    private fun onCloseGalleryPicker() {
+        getOrNull<ChatUiState.Normal>()?.copy(galleryPickerVisible = false)?.setup()
+    }
+
+    /**
+     * 把图库挑中的图片加进待发草稿。
+     *
+     * 这些图早就在应用文件库里了，只登记 UUID，不再复制一遍。
+     */
+    @UiIntentObserver(ChatUiIntent.AttachGalleryImages::class)
+    private suspend fun onAttachGalleryImages(intent: ChatUiIntent.AttachGalleryImages) {
+        getOrNull<ChatUiState.Normal>()?.copy(galleryPickerVisible = false)?.setup()
+        mImageCoordinator.attachExisting(intent.uuids)
+    }
+
     /**
      * 把选中的文本文件内容读进输入框草稿，作为一条可编辑的消息发送；
      * 二进制文件（含 NUL 字节）或读取失败的文件会被跳过，全部失败时提示。
@@ -569,9 +591,9 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
                 }
                 // 将用户消息写入数据库
                 mImageCoordinator.submit { finalInputs ->
-                    mChatRepository.createUserMessageWithImages(
-                        sessionId, input, finalInputs.filterIsInstance<MessageImageInput.Prepared>()
-                    ).also {
+                    // 草稿里的图有两种来路：本轮处理的（Prepared）和直接从图库挑的
+                    // （Existing，文件早已入库）。两者都要落进消息附件，不能只留前者。
+                    mChatRepository.createUserMessageWithImages(sessionId, input, finalInputs).also {
                         mRetryUserMessageId = it.key.messageId
                         committed = true
                     }

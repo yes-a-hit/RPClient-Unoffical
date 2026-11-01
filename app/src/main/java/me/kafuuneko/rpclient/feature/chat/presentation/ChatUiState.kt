@@ -38,6 +38,8 @@ sealed class ChatUiState {
         val hasAvailableProvider: Boolean = true,
         /** 当前页面互斥展示的对话框状态。 */
         val dialogState: ChatDialogState = ChatDialogState.None,
+        /** 图库挑选对话框是否打开。 */
+        val galleryPickerVisible: Boolean = false,
         /** 聊天页背景配置，由全局偏好解析出的已解码位图。 */
         val backgroundState: ChatBackgroundUiState = ChatBackgroundUiState()
     ) : ChatUiState()

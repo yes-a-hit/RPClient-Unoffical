@@ -16,6 +16,12 @@ sealed class GroupChatUiIntent {
     data object OpenFilePicker : GroupChatUiIntent()
     /** 文件选择器返回的已选文件。 */
     data class FilesPicked(val uris: List<Uri>) : GroupChatUiIntent()
+    /** 打开图库挑选对话框（从已导入的图片里挑，不是从手机相册导入）。 */
+    data object OpenGalleryPicker : GroupChatUiIntent()
+    /** 关闭图库挑选对话框。 */
+    data object CloseGalleryPicker : GroupChatUiIntent()
+    /** 图库挑选结果：文件 UUID，按用户勾选顺序。 */
+    data class AttachGalleryImages(val uuids: List<String>) : GroupChatUiIntent()
     data class Init(val sessionId: String?) : GroupChatUiIntent()
     data object Resume : GroupChatUiIntent()
     data object LoadOlderMessages : GroupChatUiIntent()

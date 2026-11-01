@@ -120,12 +120,12 @@ class GroupChatRepository(
     suspend fun createUserMessageWithImages(
         sessionId: Long,
         content: String,
-        images: List<MessageImageInput.Prepared>,
+        images: List<MessageImageInput>,
         speakerNameSnapshot: String
     ): MessageWithImages {
         require(images.size <= MessageImagePolicy.MAX_IMAGES_PER_MESSAGE) { "A message can contain at most four images" }
         require(content.isNotBlank() || images.isNotEmpty()) { "A message cannot have empty content and no images" }
-        return mImages.mutate(images.map { it.value }) {
+        return mImages.mutate(images.filterIsInstance<MessageImageInput.Prepared>().map { it.value }) {
             // 最终图片已在事务外发布；正文、索引和图片关系共同提交。
             val now = System.currentTimeMillis()
             val id = mMessageDao.insertOrReplace(GroupChatMessage(sessionId = sessionId, createTime = now,

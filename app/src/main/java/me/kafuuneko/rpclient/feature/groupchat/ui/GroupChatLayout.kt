@@ -58,6 +58,7 @@ import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Place
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Image as ImageIcon
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -149,6 +150,7 @@ import me.kafuuneko.rpclient.ui.dialog.MessageImageViewerDialog
 import me.kafuuneko.rpclient.ui.theme.getMacaronColor
 import me.kafuuneko.rpclient.ui.dialog.AppDialogScaffold
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
+import me.kafuuneko.rpclient.ui.widgets.GalleryPickerDialog
 import me.kafuuneko.rpclient.ui.widgets.MarkdownMessageText
 import me.kafuuneko.rpclient.ui.widgets.NoProviderBanner
 import me.kafuuneko.rpclient.ui.widgets.RpAvatar
@@ -177,6 +179,14 @@ fun GroupChatLayout(
         is GroupChatUiState.Normal -> {
             GroupChatNormalView(uiState, emitIntent)
             DialogSwitch(uiState, emitIntent)
+            if (uiState.galleryPickerVisible) {
+                GalleryPickerDialog(
+                    onDismiss = { emitIntent(GroupChatUiIntent.CloseGalleryPicker) },
+                    onConfirm = { picked ->
+                        emitIntent(GroupChatUiIntent.AttachGalleryImages(picked.map { it.fileUuid }))
+                    }
+                )
+            }
             LoadStateOverlay(uiState.loadState)
         }
     }
@@ -260,6 +270,7 @@ private fun GroupChatNormalView(
                     onStop = { emitIntent(GroupChatUiIntent.StopGeneration) },
                     onImageAction = { emitIntent(GroupChatUiIntent.ImageAction(it)) },
                     onOpenFilePicker = { emitIntent(GroupChatUiIntent.OpenFilePicker) },
+                    onOpenGalleryPicker = { emitIntent(GroupChatUiIntent.OpenGalleryPicker) },
                     canContinue = canContinue,
                     onContinue = { emitIntent(GroupChatUiIntent.ContinueLast) },
                     onSummarize = { emitIntent(GroupChatUiIntent.SummarizeNow) },
@@ -2030,6 +2041,7 @@ private fun Composer(
     onStop: () -> Unit,
     onImageAction: (MessageImageAction) -> Unit,
     onOpenFilePicker: () -> Unit,
+    onOpenGalleryPicker: () -> Unit,
     canContinue: Boolean,
     onContinue: () -> Unit,
     onSummarize: () -> Unit,
@@ -2154,6 +2166,20 @@ private fun Composer(
                                     onClick = {
                                         menuExpanded = false
                                         onOpenFilePicker()
+                                    }
+                                )
+                                // 从图库挑：图已经导进来、也分好类了，聊天里得能直接用。
+                                DropdownMenuItem(
+                                    text = { Text("从图库选") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.PhotoLibrary,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onOpenGalleryPicker()
                                     }
                                 )
                             }

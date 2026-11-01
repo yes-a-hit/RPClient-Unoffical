@@ -146,6 +146,7 @@ import me.kafuuneko.rpclient.ui.theme.AppTheme
 import me.kafuuneko.rpclient.ui.theme.DefaultCharacterAccentColor
 import me.kafuuneko.rpclient.ui.theme.NarratorAvatarColor
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
+import me.kafuuneko.rpclient.ui.widgets.GalleryPickerDialog
 import me.kafuuneko.rpclient.ui.widgets.MarkdownMessageText
 import me.kafuuneko.rpclient.ui.widgets.NoProviderBanner
 import me.kafuuneko.rpclient.ui.widgets.RpAvatar
@@ -191,6 +192,14 @@ fun ChatLayout(
                 )
             }
             DialogSwitch(uiState, emit)
+            if (uiState.galleryPickerVisible) {
+                GalleryPickerDialog(
+                    onDismiss = { ChatUiIntent.CloseGalleryPicker.emit() },
+                    onConfirm = { picked ->
+                        ChatUiIntent.AttachGalleryImages(picked.map { it.fileUuid }).emit()
+                    }
+                )
+            }
         }
     }
 }
@@ -1454,6 +1463,16 @@ private fun ChatInputBar(
                                     onClick = {
                                         menuExpanded = false
                                         ChatUiIntent.OpenFilePicker.emit()
+                                    }
+                                )
+                                // 从图库挑：图已经导进来、也分好类了，聊天里得能直接用，
+                                // 不然每次都要先去图库复制一遍再回相册翻。
+                                DropdownMenuItem(
+                                    text = { Text("从图库选") },
+                                    leadingIcon = { Icon(Icons.Rounded.PhotoLibrary, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        ChatUiIntent.OpenGalleryPicker.emit()
                                     }
                                 )
                             }

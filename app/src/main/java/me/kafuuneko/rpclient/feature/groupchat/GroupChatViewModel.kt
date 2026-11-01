@@ -231,6 +231,28 @@ class GroupChatViewModel :
         GroupChatViewEvent.OpenFilePicker.tryEmit()
     }
 
+    /** 打开图库挑选对话框：从已导入的图片里挑，不经过系统相册。 */
+    @UiIntentObserver(GroupChatUiIntent.OpenGalleryPicker::class)
+    private fun onOpenGalleryPicker() {
+        getOrNull<GroupChatUiState.Normal>()?.copy(galleryPickerVisible = true)?.setup()
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.CloseGalleryPicker::class)
+    private fun onCloseGalleryPicker() {
+        getOrNull<GroupChatUiState.Normal>()?.copy(galleryPickerVisible = false)?.setup()
+    }
+
+    /**
+     * 把图库挑中的图片加进待发草稿。
+     *
+     * 这些图早就在应用文件库里了，只登记 UUID，不再复制一遍。
+     */
+    @UiIntentObserver(GroupChatUiIntent.AttachGalleryImages::class)
+    private suspend fun onAttachGalleryImages(intent: GroupChatUiIntent.AttachGalleryImages) {
+        getOrNull<GroupChatUiState.Normal>()?.copy(galleryPickerVisible = false)?.setup()
+        mImageCoordinator.attachExisting(intent.uuids)
+    }
+
     @UiIntentObserver(GroupChatUiIntent.FilesPicked::class)
     private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {
         val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
@@ -985,7 +1007,9 @@ class GroupChatViewModel :
                     mGroupChatRepository.createUserMessageWithImages(
                         sessionId = sessionId,
                         content = input,
-                        images = finalInputs.filterIsInstance<MessageImageInput.Prepared>(),
+                        // 草稿里的图有两种来路：本轮处理的（Prepared）和直接从图库挑的
+                        // （Existing，文件早已入库）。两者都要落进消息附件。
+                        images = finalInputs,
                         speakerNameSnapshot = initialData.session.userName
                     ).key.messageId
                 }

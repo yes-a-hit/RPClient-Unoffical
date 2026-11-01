@@ -47,6 +47,15 @@ sealed class ChatUiIntent {
     /** 文件选择器返回的 URI 列表。 */
     data class FilesPicked(val uris: List<Uri>) : ChatUiIntent()
 
+    /** 打开图库挑选对话框（从已导入的图片里挑，不是从手机相册导入）。 */
+    data object OpenGalleryPicker : ChatUiIntent()
+
+    /** 关闭图库挑选对话框。 */
+    data object CloseGalleryPicker : ChatUiIntent()
+
+    /** 图库挑选结果：文件 UUID，按用户勾选顺序。 */
+    data class AttachGalleryImages(val uuids: List<String>) : ChatUiIntent()
+
     data class ChangeSessionLorebookDialogQuery(val value: String) : ChatUiIntent()
 
     data class ToggleSessionLorebookDialogEntry(val entryId: Long) : ChatUiIntent()

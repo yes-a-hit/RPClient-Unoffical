@@ -53,7 +53,9 @@ sealed class GroupChatUiState {
         /** 当前会话可切换的场景列表；空表示这个群没配场景。 */
         val scenes: List<GroupChatSceneItem> = emptyList(),
         /** 当前生效的场景 ID；空表示不限场景，全员在场。 */
-        val activeSceneId: String = ""
+        val activeSceneId: String = "",
+        /** 图库挑选对话框是否打开。 */
+        val galleryPickerVisible: Boolean = false
     ) : GroupChatUiState()
 
     data class Finished(val previous: GroupChatUiState) : GroupChatUiState()

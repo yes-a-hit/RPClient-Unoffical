@@ -75,13 +75,38 @@ class MessageImageCoordinator(
     /**
      * 返回草稿凭据；只允许全部图片准备完成后提交。
      *
-     * @return 按草稿显示顺序排列的暂存附件。
+     * 草稿里的 UUID 有两种来源：本次从系统选择器挑进来的（`mPrepared` 里有凭据），
+     * 以及直接从图库挑的（文件早已入库，不需要再复制一遍）。后者以
+     * [MessageImageInput.Existing] 交给提交层，由消息仓库校验所有权。
+     *
+     * @return 按草稿显示顺序排列的附件。
      * @throws IllegalStateException 图片尚在处理中时抛出。
-     * @throws IllegalArgumentException 草稿的暂存凭据缺失时抛出。
      */
-    fun draftInputs(): List<MessageImageInput.Prepared> {
+    fun draftInputs(): List<MessageImageInput> {
         check(!state.processing) { "Images are still being processed" }
-        return state.draft.map { MessageImageInput.Prepared(requireNotNull(mPrepared[it])) }
+        return state.draft.map { uuid ->
+            mPrepared[uuid]?.let(MessageImageInput::Prepared) ?: MessageImageInput.Existing(uuid)
+        }
+    }
+
+    /**
+     * 把图库里已经存在的图片直接追加到草稿。
+     *
+     * 和 [pick] 的区别是不做「URI → 复制入库」那一步：图库图片本来就是应用文件库里的记录，
+     * 再复制一份只会白白占空间，所以这里只登记 UUID 并解码缩略图。
+     *
+     * @param uuids 图库图片对应的文件 UUID，按用户挑选的顺序。
+     */
+    suspend fun attachExisting(uuids: List<String>) {
+        if (uuids.isEmpty() || state.processing || state.submitting) return
+        val accepted = uuids.filter { it !in state.draft }
+        if (accepted.isEmpty()) return
+        if (state.draft.size + accepted.size > MessageImagePolicy.MAX_IMAGES_PER_MESSAGE) {
+            publish(state.copy(errorResId = R.string.image_prepare_failed))
+            return
+        }
+        publish(state.copy(draft = state.draft + accepted, errorResId = null))
+        accepted.forEach { load(it) }
     }
 
     /**

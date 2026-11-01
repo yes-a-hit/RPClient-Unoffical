@@ -43,11 +43,15 @@ class MessageImageRepository(
         val old = mImages.getByMessage(key.messageType, key.messageId)
         val oldUuids = old.map { it.imageUuid }.toSet()
         // 新附件必须来自本事务已提交索引的草稿；保留附件必须属于原消息。
+        // 图库挑图走的是第三种情况：文件早就在库里，这里为它建一份独立索引，
+        // 字节仍按 hash 共享——直接复用原 uuid 会让两条消息共用一条索引，
+        // 删掉其中一条就会把另一条的附图一起带走。
         val uuids = inputs.map {
             when (it) {
-                is MessageImageInput.Existing -> it.uuid.also { uuid ->
-                    require(uuid in oldUuids) { "The image does not belong to the message being edited" }
-                }
+                is MessageImageInput.Existing ->
+                    if (it.uuid in oldUuids) it.uuid
+                    else mutation.copyReference(it.uuid).uuid
+
                 is MessageImageInput.Prepared -> it.value.file.uuid
             }
         }
