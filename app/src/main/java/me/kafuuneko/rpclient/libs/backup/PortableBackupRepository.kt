@@ -594,13 +594,17 @@ class PortableBackupRepository(
         val objects = JSONArray()
         db.query(
             "SELECT type, name, tbl_name, sql FROM sqlite_master " +
-                "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name != 'android_metadata' " +
+                "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' " +
+                "AND name NOT IN ('android_metadata', 'room_master_table') " +
+                "AND tbl_name != 'room_master_table' " +
                 "ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END, name", emptyArray()
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 val name = cursor.getString(1)
                 val tableName = cursor.getString(2)
-                if (name != "android_metadata" && tableName != "android_metadata") {
+                if (name != "android_metadata" && tableName != "android_metadata" &&
+                    name != "room_master_table" && tableName != "room_master_table"
+                ) {
                     objects.put(JSONObject()
                         .put("type", cursor.getString(0))
                         .put("name", name)
@@ -616,7 +620,8 @@ class PortableBackupRepository(
         val result = mutableListOf<String>()
         db.query(
             "SELECT name FROM sqlite_master WHERE type='table' " +
-                "AND name NOT LIKE 'sqlite_%' AND name != 'android_metadata' ORDER BY name", emptyArray()
+                "AND name NOT LIKE 'sqlite_%' " +
+                "AND name NOT IN ('android_metadata', 'room_master_table') ORDER BY name", emptyArray()
         ).use { cursor -> while (cursor.moveToNext()) result += cursor.getString(0) }
         return result
     }
@@ -688,7 +693,7 @@ class PortableBackupRepository(
         val result = linkedMapOf<String, MutableList<JSONObject>>()
         File(snapshot, "tables").listFiles().orEmpty().filter { it.isFile && it.extension == "jsonl" }.forEach { file ->
             val table = tableNameForFile(objects, file.nameWithoutExtension)
-            if (table == "android_metadata") return@forEach
+            if (table == "android_metadata" || table == "room_master_table") return@forEach
             file.forEachLine(Charsets.UTF_8) { line ->
                 if (line.isNotBlank()) result.getOrPut(table) { mutableListOf() }.add(JSONObject(line))
             }
@@ -705,11 +710,15 @@ class PortableBackupRepository(
         val allowedTables = mutableSetOf<String>()
         for (index in 0 until objects.length()) {
             val item = objects.getJSONObject(index)
-            if (item.optString("type") == "table" && item.optString("name") != "android_metadata") {
+            if (item.optString("type") == "table" && item.optString("name") != "android_metadata" &&
+                item.optString("name") != "room_master_table"
+            ) {
                 allowedTables.add(item.optString("name"))
             }
         }
-        val unknownTable = tableRows.keys.firstOrNull { it !in allowedTables }
+        val unknownTable = tableRows.keys.firstOrNull {
+            it != "room_master_table" && it !in allowedTables
+        }
         require(unknownTable == null) { "Backup contains rows for an unknown table: " + unknownTable }
         destination.parentFile?.mkdirs()
         if (destination.exists()) destination.delete()
@@ -720,34 +729,40 @@ class PortableBackupRepository(
                 val item = objects.getJSONObject(index)
                 if (item.optString("type") != "table") continue
                 val name = item.optString("name")
-                // Android creates android_metadata when opening a database. It is intentionally
-                // excluded from archives and must never be created a second time.
-                if (name != "android_metadata" && !sqliteTableExists(db, name)) {
+                // Android creates android_metadata when opening a database, and Room writes
+                // room_master_table with its own identity hash. Both are excluded from archives:
+                // re-creating room_master_table would restore a stale hash that no longer matches
+                // the schema this build expects, which makes Room refuse to open the database.
+                if (name != "android_metadata" && name != "room_master_table" &&
+                    !sqliteTableExists(db, name)
+                ) {
                     db.execSQL(item.getString("sql"))
                 }
             }
             db.beginTransaction()
             try {
                 tableRows.forEach { (table, rows) ->
-                    rows.forEach { row ->
-                        val columns = mutableListOf<String>()
-                        val values = mutableListOf<Any?>()
-                        val keys = row.keys()
-                        while (keys.hasNext()) {
-                            val key = keys.next()
-                            columns.add(key)
-                            values.add(jsonValue(row.get(key)))
-                        }
-                        if (columns.isNotEmpty()) {
-                            val sql = "INSERT INTO " + quote(table) + " (" +
-                                columns.joinToString(",") { quote(it) } + ") VALUES (" +
-                                columns.joinToString(",") { "?" } + ")"
-                            val statement = db.compileStatement(sql)
-                            try {
-                                values.forEachIndexed { index, value -> bind(statement, index + 1, value) }
-                                statement.executeInsert()
-                            } finally {
-                                statement.close()
+                    if (table != "room_master_table") {
+                        rows.forEach { row ->
+                            val columns = mutableListOf<String>()
+                            val values = mutableListOf<Any?>()
+                            val keys = row.keys()
+                            while (keys.hasNext()) {
+                                val key = keys.next()
+                                columns.add(key)
+                                values.add(jsonValue(row.get(key)))
+                            }
+                            if (columns.isNotEmpty()) {
+                                val sql = "INSERT INTO " + quote(table) + " (" +
+                                    columns.joinToString(",") { quote(it) } + ") VALUES (" +
+                                    columns.joinToString(",") { "?" } + ")"
+                                val statement = db.compileStatement(sql)
+                                try {
+                                    values.forEachIndexed { index, value -> bind(statement, index + 1, value) }
+                                    statement.executeInsert()
+                                } finally {
+                                    statement.close()
+                                }
                             }
                         }
                     }
@@ -758,7 +773,11 @@ class PortableBackupRepository(
             }
             for (index in 0 until objects.length()) {
                 val item = objects.getJSONObject(index)
-                if (item.optString("type") != "table" && item.optString("table") != "android_metadata") {
+                if (item.optString("type") != "table" &&
+                    item.optString("name") != "room_master_table" &&
+                    item.optString("table") != "android_metadata" &&
+                    item.optString("table") != "room_master_table"
+                ) {
                     db.execSQL(item.getString("sql"))
                 }
             }
