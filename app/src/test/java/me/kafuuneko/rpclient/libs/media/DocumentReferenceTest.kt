@@ -12,9 +12,22 @@ import org.junit.Test
 class DocumentReferenceTest {
 
     @Test
-    fun `renders a reference marker without the body`() {
+    fun `renders the body inside the markers`() {
+        // 正文必须留在消息里：这是「用户把文件递过来」最直白的表达，
+        // 模型看得见、备份带得走；界面上由卡片收起，不会顶穿气泡
         val document = AttachedDocument(id = "doc123", name = "spec.md", text = "很长很长的正文")
-        assertEquals("[文件：spec.md#doc123]", document.renderForMessage())
+        assertEquals("[文件：spec.md]\n很长很长的正文\n[/文件]", document.renderForMessage())
+    }
+
+    @Test
+    fun `body written by the sender is read back by the splitter`() {
+        val document = AttachedDocument(id = "doc123", name = "spec.md", text = "第一段\n第二段")
+        val content = "看这个\n\n" + document.renderForMessage()
+        val segments = me.kafuuneko.rpclient.ui.widgets.MessageDocumentBlock.split(content)
+        assertEquals(2, segments.size)
+        val card = segments[1] as me.kafuuneko.rpclient.ui.widgets.MessageDocumentBlock.Segment.Document
+        assertEquals("spec.md", card.name)
+        assertEquals("第一段\n第二段", card.inlineBody)
     }
 
     @Test
@@ -51,5 +64,15 @@ class DocumentReferenceTest {
     fun `new ids do not collide`() {
         val ids = (1..200).map { DocumentStore.newId() }.toSet()
         assertEquals(200, ids.size)
+    }
+
+    @Test
+    fun `marker produced by the sender is recognised by the parser`() {
+        // 发送时拼的标记和渲染时认的标记必须是同一套写法，
+        // 否则消息里会露出一行谁都读不懂的方括号
+        val document = AttachedDocument(id = DocumentStore.newId(), name = "规范 v2.md", text = "正文")
+        val content = "帮我看下\n\n" + document.renderForMessage()
+        val segments = me.kafuuneko.rpclient.ui.widgets.MessageDocumentBlock.split(content)
+        assertEquals(1, segments.filterIsInstance<me.kafuuneko.rpclient.ui.widgets.MessageDocumentBlock.Segment.Document>().size)
     }
 }

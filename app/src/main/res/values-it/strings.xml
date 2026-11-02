@@ -1520,4 +1520,5 @@ Apri le impostazioni del modello per verificare la chiave API, l\'URL di base, i
     <string name="gif_capture_description">"Le GIF animate vengono divise in fotogrammi e unite in una striscia, così il modello vede l'ordine. Più fotogrammi consumano più token di visione."</string>
     <string name="gif_capture_frames">"Fotogrammi da campionare (1-6)"</string>
     <string name="gif_capture_min_delay">"Ritardo minimo del fotogramma in ms (20-1000)"</string>
+    <string name="poke_actions_global_subtitle">"Usato da tutte le chat singole. %1$d azioni configurate."</string>
 </resources>

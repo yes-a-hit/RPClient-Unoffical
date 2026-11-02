@@ -1542,4 +1542,5 @@ Mở Cài đặt mô hình để kiểm tra khóa API, URL cơ sở, tên mô h�
     <string name="gif_capture_description">"GIF động được tách thành vài khung rồi ghép thành một dải để mô hình thấy được thứ tự. Càng nhiều khung càng tốn token thị giác."</string>
     <string name="gif_capture_frames">"Số khung trích xuất (1-6)"</string>
     <string name="gif_capture_min_delay">"Độ trễ khung tối thiểu, ms (20-1000)"</string>
+    <string name="poke_actions_global_subtitle">"Dùng cho mọi cuộc trò chuyện riêng. Đã cấu hình %1$d hành động."</string>
 </resources>

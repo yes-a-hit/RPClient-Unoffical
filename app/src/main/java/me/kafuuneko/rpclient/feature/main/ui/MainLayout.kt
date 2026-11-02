@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AddComment
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material.icons.rounded.Bookmarks
@@ -125,6 +126,7 @@ import me.kafuuneko.rpclient.feature.main.model.items.MainAdventureItem
 import me.kafuuneko.rpclient.feature.main.model.items.MainStoryItem
 import me.kafuuneko.rpclient.feature.main.presentation.MainAppearanceSettingsState
 import me.kafuuneko.rpclient.feature.main.presentation.MainDebugSettingsState
+import me.kafuuneko.rpclient.feature.main.presentation.MainPokeActionState
 import me.kafuuneko.rpclient.feature.main.presentation.MainDialogState
 import me.kafuuneko.rpclient.feature.main.presentation.MainGenerationParametersState
 import me.kafuuneko.rpclient.feature.main.presentation.MainHomeResourceState
@@ -171,6 +173,7 @@ import me.kafuuneko.rpclient.ui.theme.ProviderAvailableColor
 import me.kafuuneko.rpclient.ui.theme.ProviderDisabledColor
 import me.kafuuneko.rpclient.ui.theme.ProviderPendingColor
 import me.kafuuneko.rpclient.ui.theme.getMacaronColor
+import me.kafuuneko.rpclient.ui.widgets.PokeActionEditorDialog
 import me.kafuuneko.rpclient.ui.widgets.RpAvatar
 import me.kafuuneko.rpclient.ui.widgets.RpIconBubble
 import me.kafuuneko.rpclient.ui.widgets.RpInfoCard
@@ -1565,6 +1568,7 @@ private fun SettingsPage(
         item { ImageSendPanel(state.imageSendState, emit) }
         item { ImageGenPanel(state.imageGenState, emit) }
         item { SkillPanel(state.skillState, emit) }
+        item { PokeActionsPanel(state.pokeActionState, emit) }
 
         // ================= 4. 数据与系统 =================
         item {
@@ -1577,6 +1581,33 @@ private fun SettingsPage(
         item { ScriptEditorEntryCard { emit(MainUiIntent.OpenScriptEditor) } }
         item { DebugPanel(state.debugState, emit) }
         item { AboutEntryCard { emit(MainUiIntent.OpenAbout) } }
+    }
+}
+
+@Composable
+private fun PokeActionsPanel(
+    state: MainPokeActionState,
+    emit: MainUiIntent.() -> Unit
+) {
+    RpSettingsGroup {
+        RpSettingsTile(
+            title = stringResource(R.string.poke_actions_title),
+            subtitle = stringResource(R.string.poke_actions_global_subtitle, state.actions.size),
+            icon = Icons.Rounded.TouchApp,
+            onClick = { MainUiIntent.OpenPokeActionEditor.emit() }
+        )
+    }
+    if (state.editorVisible) {
+        PokeActionEditorDialog(
+            drafts = state.drafts,
+            onDismiss = { MainUiIntent.ClosePokeActionEditor.emit() },
+            onChange = { id, label, template ->
+                MainUiIntent.ChangePokeAction(id, label, template).emit()
+            },
+            onAdd = { MainUiIntent.AddPokeAction.emit() },
+            onRemove = { MainUiIntent.RemovePokeAction(it).emit() },
+            onSave = { MainUiIntent.SavePokeActions.emit() }
+        )
     }
 }
 

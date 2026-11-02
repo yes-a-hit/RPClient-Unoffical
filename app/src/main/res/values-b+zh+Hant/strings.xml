@@ -1536,4 +1536,5 @@
     <string name="gif_capture_description">"動圖會被抽成幾幀拼成一張連環畫，模型才能看出先後順序。幀數越多越吃視覺 token。"</string>
     <string name="gif_capture_frames">"抽幀數量（1-6）"</string>
     <string name="gif_capture_min_delay">"幀延遲下限，毫秒（20-1000）"</string>
+    <string name="poke_actions_global_subtitle">"所有單人會話預設使用這一套，目前 %1$d 個動作。"</string>
 </resources>

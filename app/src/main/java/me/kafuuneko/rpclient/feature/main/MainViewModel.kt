@@ -41,6 +41,7 @@ import me.kafuuneko.rpclient.feature.main.presentation.MainAppearanceSettingsSta
 import me.kafuuneko.rpclient.feature.main.presentation.MainChatBackgroundState
 import me.kafuuneko.rpclient.feature.main.presentation.MainChatDataManagementState
 import me.kafuuneko.rpclient.feature.main.presentation.MainDebugSettingsState
+import me.kafuuneko.rpclient.feature.main.presentation.MainPokeActionState
 import me.kafuuneko.rpclient.feature.main.presentation.MainDialogState
 import me.kafuuneko.rpclient.feature.main.presentation.MainGenerationParametersState
 import me.kafuuneko.rpclient.feature.main.presentation.MainHomeResourceState
@@ -1099,6 +1100,104 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
         AppViewEvent.StartActivity(AboutActivity::class.java).tryEmit()
     }
 
+    /** 打开动作表编辑器，草稿从盘上的值复制一份。 */
+    @UiIntentObserver(MainUiIntent.OpenPokeActionEditor::class)
+    private fun onOpenPokeActionEditor() {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        val current = uiState.settingsState.pokeActionState.actions
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                pokeActionState = uiState.settingsState.pokeActionState.copy(
+                    drafts = current,
+                    editorVisible = true
+                )
+            )
+        ).setup()
+    }
+
+    @UiIntentObserver(MainUiIntent.ClosePokeActionEditor::class)
+    private fun onClosePokeActionEditor() {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                pokeActionState = uiState.settingsState.pokeActionState.copy(
+                    drafts = emptyList(),
+                    editorVisible = false
+                )
+            )
+        ).setup()
+    }
+
+    @UiIntentObserver(MainUiIntent.ChangePokeAction::class)
+    private fun onChangePokeAction(intent: MainUiIntent.ChangePokeAction) {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        val poke = uiState.settingsState.pokeActionState
+        val drafts = poke.drafts.map { action ->
+            if (action.id != intent.id) {
+                action
+            } else {
+                action.copy(label = intent.label, template = intent.template)
+            }
+        }
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                pokeActionState = poke.copy(drafts = drafts)
+            )
+        ).setup()
+    }
+
+    @UiIntentObserver(MainUiIntent.AddPokeAction::class)
+    private fun onAddPokeAction() {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        val poke = uiState.settingsState.pokeActionState
+        // 新条目的 id 用一个不会被用户改到的值，免得和内置三条撞车
+        val newId = "custom" + (poke.drafts.size + 1)
+        val drafts = poke.drafts + me.kafuuneko.rpclient.libs.poke.PokeAction(
+            id = newId,
+            label = "",
+            template = "（{name}）"
+        )
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                pokeActionState = poke.copy(drafts = drafts)
+            )
+        ).setup()
+    }
+
+    @UiIntentObserver(MainUiIntent.RemovePokeAction::class)
+    private fun onRemovePokeAction(intent: MainUiIntent.RemovePokeAction) {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        val poke = uiState.settingsState.pokeActionState
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                pokeActionState = poke.copy(drafts = poke.drafts.filterNot { it.id == intent.id })
+            )
+        ).setup()
+    }
+
+    @UiIntentObserver(MainUiIntent.SavePokeActions::class)
+    private fun onSavePokeActions() {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        val poke = uiState.settingsState.pokeActionState
+        val cleaned = poke.drafts.filter { it.label.isNotBlank() }
+        if (cleaned.isEmpty()) {
+            AppViewEvent.PopupToastMessageByResId(
+                me.kafuuneko.rpclient.R.string.poke_actions_need_one
+            ).tryEmit()
+            return
+        }
+        AppModel.pokeActions = me.kafuuneko.rpclient.libs.poke.PokeActions.serialize(cleaned)
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                pokeActionState = poke.copy(
+                    actions = cleaned,
+                    drafts = emptyList(),
+                    editorVisible = false
+                )
+            )
+        ).setup()
+    }
+
     /** 修改用户默认显示名称并持久化。 */
     @UiIntentObserver(MainUiIntent.ChangeUserName::class)
     private fun onChangeUserName(intent: MainUiIntent.ChangeUserName) {
@@ -1878,6 +1977,9 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
             imageSendState = MainImageSendState.withGif(
                 MainImageSendState.from(ImageSendSettings.decode(AppModel.imageSendSettings)),
                 GifCaptureSettings.decode(AppModel.gifSampleFrames, AppModel.gifFrameDelayMs)
+            ),
+            pokeActionState = MainPokeActionState(
+                actions = me.kafuuneko.rpclient.libs.poke.PokeActions.parse(AppModel.pokeActions)
             ),
             appearanceState = MainAppearanceSettingsState(
                 themeMode = mAppThemeManager.themeModeFlow.value,

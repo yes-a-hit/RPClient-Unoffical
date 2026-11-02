@@ -1536,4 +1536,5 @@
     <string name="gif_capture_description">"动图会被抽成几帧拼成一张连环画，模型才能看出先后顺序。帧数越多越吃视觉 token。"</string>
     <string name="gif_capture_frames">"抽帧数量（1-6）"</string>
     <string name="gif_capture_min_delay">"帧延迟下限，毫秒（20-1000）"</string>
+    <string name="poke_actions_global_subtitle">"所有单人会话默认使用这一套，当前 %1$d 个动作。"</string>
 </resources>

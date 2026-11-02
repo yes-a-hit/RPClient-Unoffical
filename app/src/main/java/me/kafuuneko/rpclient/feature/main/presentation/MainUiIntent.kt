@@ -243,6 +243,23 @@ sealed class MainUiIntent {
 
     data object OpenAbout : MainUiIntent()
 
+    /** 打开全局动作表编辑器（戳一戳、摸头、捏脸……）。 */
+    data object OpenPokeActionEditor : MainUiIntent()
+
+    data object ClosePokeActionEditor : MainUiIntent()
+
+    data class ChangePokeAction(
+        val id: String,
+        val label: String,
+        val template: String
+    ) : MainUiIntent()
+
+    data object AddPokeAction : MainUiIntent()
+
+    data class RemovePokeAction(val id: String) : MainUiIntent()
+
+    data object SavePokeActions : MainUiIntent()
+
     data class EnterMultiSelect(val item: MainHomeItemSelection) : MainUiIntent()
 
     data class ToggleItemSelection(val item: MainHomeItemSelection) : MainUiIntent()

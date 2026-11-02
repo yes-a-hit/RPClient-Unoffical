@@ -36,7 +36,10 @@ data class MainSettingsState(
     /** 设置页中外接生图服务的连接与默认参数。 */
     val imageGenState: MainImageGenSettingsState = MainImageGenSettingsState(),
     /** 设置页中已安装的助手 Skill 列表。 */
-    val skillState: MainSkillSettingsState = MainSkillSettingsState()
+    val skillState: MainSkillSettingsState = MainSkillSettingsState(),
+
+    /** 全局动作表（戳一戳、摸头、捏脸……），单人会话可以在此基础上另存一套。 */
+    val pokeActionState: MainPokeActionState = MainPokeActionState()
 )
 
 /**
@@ -322,4 +325,18 @@ sealed class MainChatDataManagementState {
 data class MainDebugSettingsState(
     /** 当前对象或功能是否启用。 */
     val enabled: Boolean
+)
+
+/**
+ * 全局动作表的状态。
+ *
+ * 动作本身是「用户按一下，代替自己说一句话」，属于跨会话的个人习惯，
+ * 所以放在全局设置里；单人会话想另搞一套，再在会话设置里覆盖。
+ */
+data class MainPokeActionState(
+    val actions: List<me.kafuuneko.rpclient.libs.poke.PokeAction> =
+        me.kafuuneko.rpclient.libs.poke.PokeActions.DEFAULTS,
+    /** 编辑中的草稿，未保存前不动盘上的值。 */
+    val drafts: List<me.kafuuneko.rpclient.libs.poke.PokeAction> = emptyList(),
+    val editorVisible: Boolean = false
 )

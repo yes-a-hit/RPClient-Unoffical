@@ -1594,4 +1594,5 @@
     <string name="gif_capture_description">"Animated GIFs are split into frames and joined into one strip, so the model can see the order of events. More frames cost more vision tokens."</string>
     <string name="gif_capture_frames">"Frames to sample (1-6)"</string>
     <string name="gif_capture_min_delay">"Minimum frame delay in ms (20-1000)"</string>
+    <string name="poke_actions_global_subtitle">"Used by every single chat. %1$d actions configured."</string>
 </resources>

@@ -23,12 +23,18 @@ data class AttachedDocument(
     val charCount: Int get() = text.length
 
     /**
-     * 消息体里的引用标记。
+     * 拼进消息体的样子。
      *
-     * 不带正文：正文一进消息就跟着聊天记录走，几万字会顶穿气泡，
-     * 也会在每次请求里重复计费。正文放在磁盘上按需取。
+     * 正文仍然夹在消息里——这是「用户把一份文件递过来」最直白的表达，
+     * 模型看得见、历史存得下、导出备份也带得走。界面上由
+     * `MessageDocumentBlock` 认这两个标记，把它收成一张可展开的卡片，
+     * 所以不会把气泡顶穿。
      */
-    fun renderForMessage(): String = "[文件：" + name + "#" + id + "]"
+    fun renderForMessage(): String = buildString {
+        append("[文件：").append(name).append("]\n")
+        append(text)
+        append("\n[/文件]")
+    }
 }
 
 /** 从正文里认出的一个文档引用。 */

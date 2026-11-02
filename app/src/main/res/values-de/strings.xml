@@ -1541,4 +1541,5 @@
     <string name="gif_capture_description">"Animierte GIFs werden in Einzelbilder zerlegt und zu einem Streifen zusammengesetzt, damit das Modell die Reihenfolge erkennt. Mehr Bilder kosten mehr Vision-Token."</string>
     <string name="gif_capture_frames">"Anzahl Einzelbilder (1-6)"</string>
     <string name="gif_capture_min_delay">"Minimale Bildverzögerung in ms (20-1000)"</string>
+    <string name="poke_actions_global_subtitle">"Gilt für alle Einzelchats. %1$d Aktionen eingerichtet."</string>
 </resources>

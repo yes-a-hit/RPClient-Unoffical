@@ -1546,4 +1546,5 @@
     <string name="gif_capture_description">"Анимированные GIF разбиваются на кадры и склеиваются в полосу, чтобы модель видела порядок событий. Чем больше кадров, тем больше визуальных токенов."</string>
     <string name="gif_capture_frames">"Число кадров (1-6)"</string>
     <string name="gif_capture_min_delay">"Минимальная задержка кадра, мс (20-1000)"</string>
+    <string name="poke_actions_global_subtitle">"Используется во всех личных чатах. Настроено действий: %1$d."</string>
 </resources>

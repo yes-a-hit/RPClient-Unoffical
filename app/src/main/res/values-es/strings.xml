@@ -1543,4 +1543,5 @@
     <string name="gif_capture_description">"Los GIF animados se dividen en fotogramas y se unen en una tira para que el modelo vea el orden. Más fotogramas gastan más tokens de visión."</string>
     <string name="gif_capture_frames">"Fotogramas a muestrear (1-6)"</string>
     <string name="gif_capture_min_delay">"Retardo mínimo del fotograma en ms (20-1000)"</string>
+    <string name="poke_actions_global_subtitle">"Se usa en todos los chats individuales. %1$d acciones configuradas."</string>
 </resources>

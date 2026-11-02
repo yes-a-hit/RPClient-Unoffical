@@ -1537,4 +1537,5 @@
     <string name="gif_capture_description">"アニメーション GIF は数コマに抽出して一枚の帯にまとめられ、モデルが順序を把握できます。コマ数を増やすほど視覚トークンを消費します。"</string>
     <string name="gif_capture_frames">"抽出コマ数（1-6）"</string>
     <string name="gif_capture_min_delay">"フレーム遅延の下限（ミリ秒、20-1000）"</string>
+    <string name="poke_actions_global_subtitle">"すべての個人チャットで使われます。現在 %1$d 個のアクション。"</string>
 </resources>

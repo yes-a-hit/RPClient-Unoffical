@@ -695,29 +695,6 @@ private fun GroupChatSettingsView(
                 }
             }
             item {
-                GroupSettingsSection(title = stringResource(R.string.poke_actions_title)) {
-                    Text(
-                        text = stringResource(R.string.poke_actions_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val actions = state.pokeActions.ifEmpty { PokeActions.DEFAULTS }
-                    actions.forEach { action ->
-                        SettingsActionRow(
-                            icon = Icons.Rounded.TouchApp,
-                            title = action.label,
-                            subtitle = action.template,
-                            onClick = { emitIntent(GroupChatUiIntent.OpenPokeActionEditor) }
-                        )
-                    }
-                    SettingsActionRow(
-                        icon = Icons.Rounded.Edit,
-                        title = stringResource(R.string.poke_actions_edit),
-                        onClick = { emitIntent(GroupChatUiIntent.OpenPokeActionEditor) }
-                    )
-                }
-            }
-            item {
                 GroupSettingsSection(title = stringResource(R.string.chat_settings_actions)) {
                     // 清空上下文：消息与摘要全清，群聊条目、成员和所有配置留着。
                     // 有它才不用为了重开一段对话去重建整个群聊。

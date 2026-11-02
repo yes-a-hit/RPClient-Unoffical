@@ -294,8 +294,7 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             AppViewEvent.PopupToastMessage(mContext.getString(R.string.attach_file_unsupported)).tryEmit()
             return
         }
-        // 正文先落盘：消息体里只留引用，气泡才不会被几万字撑开
-        withContext(Dispatchers.IO) { read.forEach { mDocumentStore.save(it) } }
+        // 正文随消息走，不再另存一份：气泡里由卡片收起，备份也带得走
         uiState.copy(
             conversationState = uiState.conversationState.copy(
                 attachedDocuments = uiState.conversationState.attachedDocuments + read
