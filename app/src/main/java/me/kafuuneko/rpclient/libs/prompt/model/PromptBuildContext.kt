@@ -70,7 +70,15 @@ data class PromptBuildContext(
      */
     val appearanceImages: List<LLMImageReference> = emptyList(),
     /** 与 [appearanceImages] 一一对应的说明，可为空串。 */
-    val appearanceNotes: List<String> = emptyList()
+    val appearanceNotes: List<String> = emptyList(),
+
+    /**
+     * 用户在这场对话里发过的文件，正文已经抽好。
+     *
+     * 文件正文不进消息体（几条 docx 就能把聊天记录顶穿，每轮还重复计费），
+     * 消息里只留引用标记；这里由调用方按需读盘后填进来，构建器只管注入。
+     */
+    val documents: List<me.kafuuneko.rpclient.libs.media.PromptDocument> = emptyList()
 )
 
 /** 本次构建对应的用户操作，会影响尾部指令和世界书生成类型过滤。 */

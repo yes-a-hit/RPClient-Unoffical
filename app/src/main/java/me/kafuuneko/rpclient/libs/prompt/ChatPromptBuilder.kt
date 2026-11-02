@@ -330,6 +330,16 @@ class ChatPromptBuilder(
                 images = context.appearanceImages
             )
         }
+        // 用户发来的文件正文；消息里只有引用标记，正文在这里补
+        if (context.documents.isNotEmpty()) {
+            beforeHistory += PromptPiece(
+                role = LLMMessageRole.System,
+                content = buildDocumentPrompt(context),
+                source = PromptSource(PromptSourceKind.AuxiliaryPrompt, "附带文件"),
+                retentionPriority = PRIORITY_ESSENTIAL,
+                canDrop = false
+            )
+        }
         beforeHistory += PromptPiece.required(
             LLMMessageRole.System,
             renderUserPersonaTemplate(
@@ -1108,5 +1118,40 @@ internal fun buildAppearancePrompt(context: PromptBuildContext): String = buildS
     append("\n这些形象就是你。用户发来同一形象的图片、表情包或梗图时，")
     append("画里的那个就是你本人，不要当成别的角色，也不要认成别人的同类。")
     append("\n如果图里是你在做某件事，那就是你自己在那样做。")
+}
+
+/**
+ * 把用户发过的文件正文注入提示词。
+ *
+ * 消息体里只有 `[文件：名字#id]` 这样的引用，模型单看那个标记读不到内容，
+ * 所以正文在这里补上。写成 system 而不是塞回用户消息，是因为它属于
+ * 「用户递过来的东西」而不是「用户说的话」——混在一起会让模型把文件内容
+ * 当成人设台词去模仿。
+ */
+internal fun buildDocumentPrompt(context: PromptBuildContext): String = buildString {
+    val documents = context.documents
+    if (documents.isEmpty()) return ""
+    if (documents.size == 1) {
+        append("用户在这段对话里发来一份文件")
+    } else {
+        append("用户在这段对话里发来 ")
+        append(documents.size)
+        append(" 份文件")
+    }
+    append("，内容如下。它们不是你写的，也不要照抄进回复，")
+    append("只在需要引用、查阅或回答相关问题时取用。")
+    documents.forEachIndexed { index, document ->
+        append("\n\n=== 文件 ")
+        append(index + 1)
+        append("：")
+        append(document.name)
+        append(" ===")
+        if (document.text.isBlank()) {
+            append("\n（内容为空或已删除）")
+        } else {
+            append("\n")
+            append(document.text)
+        }
+    }
 }
 

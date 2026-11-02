@@ -1013,8 +1013,9 @@ private fun MessageContent(
 
                                 is MessageDocumentBlock.Segment.Document -> MessageDocumentCard(
                                     name = segment.name,
-                                    body = segment.body,
-                                    isUser = isUser
+                                    body = segment.inlineBody,
+                                    isUser = isUser,
+                                    documentId = segment.id
                                 )
                             }
                         }

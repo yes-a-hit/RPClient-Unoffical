@@ -73,6 +73,8 @@ import me.kafuuneko.rpclient.libs.llm.model.LLMGenerationRequest
 import me.kafuuneko.rpclient.libs.llm.model.LLMStreamEvent
 import me.kafuuneko.rpclient.libs.llm.model.isOutputTokenLimitReached
 import me.kafuuneko.rpclient.libs.media.AttachedDocument
+import me.kafuuneko.rpclient.libs.media.DocumentStore
+import me.kafuuneko.rpclient.libs.media.DocumentReferencePattern
 import me.kafuuneko.rpclient.libs.media.DocumentText
 import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.media.MessageImageCoordinator
@@ -184,6 +186,7 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
     private val mImageCapabilities by inject<ImageInputCapabilityResolver>()
     private val mImageRuntime by inject<MessageImageRuntime>()
     private val mGalleryStore by inject<GalleryStore>()
+    private val mDocumentStore by inject<DocumentStore>()
     private val mImageCoordinator by lazy { MessageImageCoordinator(mImageRuntime, mFileRepository) { state ->
         getOrNull<ChatUiState.Normal>()?.copy(imageState = state)?.setup()
     } }
@@ -282,13 +285,17 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
                 } else {
                     readTextFileContent(uri)
                 }
-                text?.takeIf { it.isNotBlank() }?.let { AttachedDocument(name, it) }
+                text?.takeIf { it.isNotBlank() }?.let {
+                    AttachedDocument(id = DocumentStore.newId(), name = name, text = it)
+                }
             }
         }
         if (read.isEmpty()) {
             AppViewEvent.PopupToastMessage(mContext.getString(R.string.attach_file_unsupported)).tryEmit()
             return
         }
+        // 正文先落盘：消息体里只留引用，气泡才不会被几万字撑开
+        withContext(Dispatchers.IO) { read.forEach { mDocumentStore.save(it) } }
         uiState.copy(
             conversationState = uiState.conversationState.copy(
                 attachedDocuments = uiState.conversationState.attachedDocuments + read
@@ -2627,6 +2634,14 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
                 }
             }
         }
+        // 附带文件：消息体里只有引用标记，正文按 id 去仓库取；
+        // 读取放在构建器之外，构建过程保持无 IO
+        val documentExcerpts = withContext(Dispatchers.IO) {
+            val references = generationHistory.messages
+                .flatMap { DocumentReferencePattern.referencesOf(it.content) }
+                .distinctBy { it.id }
+            mDocumentStore.promptExcerpts(references)
+        }
         // 按最近消息扫描 Skill 触发词；扫描在构建器之外完成，保持构建过程无 IO
         val activeSkills = mSkillRepository.resolveActive(
             recentText = generationHistory.messages
@@ -2660,6 +2675,7 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
                     unavailableImages = imageReferences.unavailable,
                     appearanceImages = appearance.map { it.first },
                     appearanceNotes = appearance.map { it.second },
+                    documents = documentExcerpts,
                     currentUserMessage = null,
                     totalMessageCount = generationHistory.totalMessageCount,
                     candidateLorebookEntries = lorebookEntries,

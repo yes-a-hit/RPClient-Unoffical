@@ -88,7 +88,14 @@ data class GroupChatPromptContext(
     val unavailableImages: Map<Long, List<UnavailablePromptImage>> = emptyMap(),
     val protectedUserMessageId: Long? = null,
     /** 本轮激活的助手 Skill 列表，由调用方在构建前完成触发词判定。 */
-    val activeSkills: List<SkillManifest> = emptyList()
+    val activeSkills: List<SkillManifest> = emptyList(),
+    /**
+     * 用户在这场群聊里发过的文件，正文已抽好。
+     *
+     * 消息体里只有 `[文件：名字#id]` 引用，正文在这里补上；
+     * 读盘由调用方完成，构建器保持无 IO。
+     */
+    val documents: List<me.kafuuneko.rpclient.libs.media.PromptDocument> = emptyList()
 )
 
 /** 群聊回复的生成模式。 */
@@ -432,6 +439,10 @@ class GroupChatPromptBuilder(
         // 注入本轮激活的助手 Skill；群聊与单聊共用同一套能力包
         mSkillPromptBuilder.build(context.activeSkills).takeIf { it.isNotBlank() }?.let {
             before += requiredSystem(it, PromptSourceKind.Skill)
+        }
+        // 用户发来的文件正文；消息里只有引用标记，正文在这里补
+        buildDocumentPrompt(context).takeIf { it.isNotBlank() }?.let {
+            before += requiredSystem(it, PromptSourceKind.AuxiliaryPrompt)
         }
         // 注入辅助提示词
         mPreferences.auxiliaryPrompt.takeIf { it.isNotBlank() }?.let {
@@ -1143,5 +1154,38 @@ private fun Int.toMessageRole(): LLMMessageRole {
         LorebookEntry.ROLE_USER -> LLMMessageRole.User
         LorebookEntry.ROLE_ASSISTANT -> LLMMessageRole.Assistant
         else -> LLMMessageRole.System
+    }
+}
+
+/**
+ * 把用户发过的文件正文注入提示词。
+ *
+ * 群聊里所有成员共用同一份文件上下文——用户传进来的是「给大家看的东西」，
+ * 只有某个角色知道、别人一脸茫然反而奇怪。
+ */
+internal fun buildDocumentPrompt(context: GroupChatPromptContext): String = buildString {
+    val documents = context.documents
+    if (documents.isEmpty()) return ""
+    if (documents.size == 1) {
+        append("用户在这场群聊里发来一份文件")
+    } else {
+        append("用户在这场群聊里发来 ")
+        append(documents.size)
+        append(" 份文件")
+    }
+    append("，内容如下。它们不是你写的，也不要照抄进回复，")
+    append("只在需要引用、查阅或回答相关问题时取用。")
+    documents.forEachIndexed { index, document ->
+        append("\n\n=== 文件 ")
+        append(index + 1)
+        append("：")
+        append(document.name)
+        append(" ===")
+        if (document.text.isBlank()) {
+            append("\n（内容为空或已删除）")
+        } else {
+            append("\n")
+            append(document.text)
+        }
     }
 }

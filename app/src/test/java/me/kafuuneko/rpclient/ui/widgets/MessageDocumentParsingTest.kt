@@ -27,7 +27,7 @@ class MessageDocumentParsingTest {
         val doc = segments[1] as MessageDocumentBlock.Segment.Document
         assertEquals("spec.md", doc.name)
         // 文档正文原样保留，段落内的空行不能被吞掉
-        assertEquals("第一行\n第二行", doc.body)
+        assertEquals("第一行\n第二行", doc.inlineBody)
     }
 
     @Test
@@ -36,7 +36,7 @@ class MessageDocumentParsingTest {
         val doc = MessageDocumentBlock.split(content)
             .filterIsInstance<MessageDocumentBlock.Segment.Document>()
             .single()
-        assertEquals("标题\n\n正文段落\n\n\n末行", doc.body)
+        assertEquals("标题\n\n正文段落\n\n\n末行", doc.inlineBody)
     }
 
     @Test
@@ -54,7 +54,7 @@ class MessageDocumentParsingTest {
             .filterIsInstance<MessageDocumentBlock.Segment.Document>()
         assertEquals(2, docs.size)
         assertEquals(listOf("一.txt", "二.txt"), docs.map { it.name })
-        assertEquals(listOf("A", "B"), docs.map { it.body })
+        assertEquals(listOf("A", "B"), docs.map { it.inlineBody })
     }
 
     @Test

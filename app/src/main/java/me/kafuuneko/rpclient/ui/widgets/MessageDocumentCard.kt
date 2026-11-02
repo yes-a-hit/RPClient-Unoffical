@@ -24,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 消息气泡里的一份附带文件。
@@ -45,11 +48,21 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 @Composable
 fun MessageDocumentCard(
     name: String,
-    body: String,
+    body: String?,
     isUser: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    documentId: String = ""
 ) {
     var expanded by remember(name) { mutableStateOf(false) }
+    // 新消息的正文不在消息体里，展开时才去仓库取；旧消息直接就有
+    var loaded by remember(documentId) { mutableStateOf(body) }
+    val store = remember { org.koin.core.context.GlobalContext.get()
+        .get<me.kafuuneko.rpclient.libs.media.DocumentStore>() }
+    LaunchedEffect(expanded, documentId) {
+        if (!expanded || loaded != null || documentId.isBlank()) return@LaunchedEffect
+        loaded = withContext(Dispatchers.IO) { store.load(documentId)?.text }
+    }
+    val charCount = loaded?.length ?: 0
     val container = if (isUser) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
     } else {
@@ -84,7 +97,8 @@ fun MessageDocumentCard(
                         overflow = TextOverflow.MiddleEllipsis
                     )
                     Text(
-                        text = "${body.length} 字" + if (expanded) " · 已展开" else " · 点击展开",
+                        text = if (loaded == null) "已附带" + if (expanded) " · 读取中" else " · 点击展开"
+                        else "$charCount 字" + if (expanded) " · 已展开" else " · 点击展开",
                         style = MaterialTheme.typography.labelSmall,
                         color = onContainer.copy(alpha = 0.7f)
                     )
@@ -113,7 +127,7 @@ fun MessageDocumentCard(
             ) {
                 SelectionContainer {
                     Text(
-                        text = body,
+                        text = loaded ?: "",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier
                             .padding(10.dp)

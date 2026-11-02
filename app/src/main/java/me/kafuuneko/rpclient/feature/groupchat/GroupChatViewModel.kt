@@ -190,6 +190,7 @@ class GroupChatViewModel :
 
     private val mImageCapabilities by inject<ImageInputCapabilityResolver>()
     private val mImageRuntime by inject<MessageImageRuntime>()
+    private val mDocumentStore by inject<me.kafuuneko.rpclient.libs.media.DocumentStore>()
     private val mImageCoordinator by lazy { MessageImageCoordinator(mImageRuntime, mFileRepository) { state ->
         getOrNull<GroupChatUiState.Normal>()?.copy(imageState = state)?.setup()
     } }
@@ -278,8 +279,13 @@ class GroupChatViewModel :
                 } else {
                     readTextFileContent(uri)
                 }
-                text?.takeIf { it.isNotBlank() }
-                    ?.let { me.kafuuneko.rpclient.libs.media.AttachedDocument(name, it) }
+                text?.takeIf { it.isNotBlank() }?.let {
+                    me.kafuuneko.rpclient.libs.media.AttachedDocument(
+                        id = me.kafuuneko.rpclient.libs.media.DocumentStore.newId(),
+                        name = name,
+                        text = it
+                    )
+                }
             }
         }
         if (read.isEmpty()) {
@@ -288,6 +294,8 @@ class GroupChatViewModel :
             ).tryEmit()
             return
         }
+        // 正文先落盘：消息体里只留引用，气泡才不会被几万字撑开
+        withContext(Dispatchers.IO) { read.forEach { mDocumentStore.save(it) } }
         uiState.copy(
             conversationState = uiState.conversationState.copy(
                 attachedDocuments = uiState.conversationState.attachedDocuments + read
@@ -890,6 +898,13 @@ class GroupChatViewModel :
                     loadLorebookContext(data, anchor)
                 }
                 val imageReferences = mImageRuntime.prepareCandidates(promptData.messageImages)
+                // 附带文件正文：消息里只有引用标记，读盘在这里做完，builder 保持无 IO
+                val documentExcerpts = withContext(Dispatchers.IO) {
+                    val references = data.messages
+                        .flatMap { me.kafuuneko.rpclient.libs.media.DocumentReferencePattern.referencesOf(it.content) }
+                        .distinctBy { it.id }
+                    mDocumentStore.promptExcerpts(references)
+                }
                 val buildResult = withContext(Dispatchers.Default) {
                     mPromptBuilder.buildWithMetadata(
                         GroupChatPromptContext(
@@ -922,6 +937,7 @@ class GroupChatViewModel :
                             recursiveScanningLorebookIds = lorebookContext.recursiveLorebookIds,
                             provider = provider,
                             generationMode = GroupChatGenerationMode.Impersonate,
+                            documents = documentExcerpts,
                             regexScripts = mRegexRepository.activeScripts(
                                 data.members.map { it.character }
                             )
@@ -2301,6 +2317,13 @@ class GroupChatViewModel :
             loadLorebookContext(data, speaker)
         }
         val imageReferences = mImageRuntime.prepareCandidates(promptData.messageImages)
+        // 附带文件正文：消息里只有引用标记，读盘在这里做完，builder 保持无 IO
+        val documentExcerpts = withContext(Dispatchers.IO) {
+            val references = data.messages
+                .flatMap { me.kafuuneko.rpclient.libs.media.DocumentReferencePattern.referencesOf(it.content) }
+                .distinctBy { it.id }
+            mDocumentStore.promptExcerpts(references)
+        }
         // 构建多角色群聊 Prompt 请求
         val buildResult = withContext(Dispatchers.Default) {
             mPromptBuilder.buildWithMetadata(
@@ -2319,6 +2342,7 @@ class GroupChatViewModel :
                     recursiveScanningLorebookIds = lorebookContext.recursiveLorebookIds,
                     provider = provider,
                     generationMode = generationMode,
+                    documents = documentExcerpts,
                     regexScripts = mRegexRepository.activeScripts(
                         data.members.map { it.character }
                     )
