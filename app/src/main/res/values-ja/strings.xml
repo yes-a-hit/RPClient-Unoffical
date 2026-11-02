@@ -1541,4 +1541,6 @@
     <string name="poke_actions_session_own">"このチャットのみ"</string>
     <string name="poke_actions_session_inherit">"グローバル設定に従っています"</string>
     <string name="poke_actions_follow_global">"グローバル設定に戻す"</string>
+    <string name="group_chat_scene_enter_action">「%1$s」へ移動</string>
+    <string name="group_chat_scene_leave_action">「%1$s」を離れて全員に戻る</string>
 </resources>

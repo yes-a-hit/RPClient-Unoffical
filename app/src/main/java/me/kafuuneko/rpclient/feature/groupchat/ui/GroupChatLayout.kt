@@ -59,6 +59,7 @@ import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Place
+import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Image as ImageIcon
 import androidx.compose.material.icons.rounded.Info
@@ -300,6 +301,8 @@ private fun GroupChatNormalView(
                     onImageAction = { emitIntent(GroupChatUiIntent.ImageAction(it)) },
                     onOpenFilePicker = { emitIntent(GroupChatUiIntent.OpenFilePicker) },
                     onOpenGalleryPicker = { emitIntent(GroupChatUiIntent.OpenGalleryPicker) },
+                    onSwitchScene = { emitIntent(GroupChatUiIntent.SwitchScene(it.ifBlank { null })) },
+                    sceneMovements = state.sceneMovements,
                     onPerformSelfAction = {
                         emitIntent(GroupChatUiIntent.PerformSelfAction(it))
                     },
@@ -2176,6 +2179,8 @@ private fun Composer(
     onImageAction: (MessageImageAction) -> Unit,
     onOpenFilePicker: () -> Unit,
     onOpenGalleryPicker: () -> Unit,
+    onSwitchScene: (String) -> Unit,
+    sceneMovements: List<me.kafuuneko.rpclient.libs.groupchat.GroupChatScenes.SceneMovement>,
     onPerformSelfAction: (String) -> Unit,
     selfActions: List<me.kafuuneko.rpclient.libs.poke.PokeAction>,
     documents: List<me.kafuuneko.rpclient.libs.media.AttachedDocument>,
@@ -2327,6 +2332,41 @@ private fun Composer(
                                         onOpenGalleryPicker()
                                     }
                                 )
+                                // 场景移动：进哪一场、或者从当前这场退回全员。
+                                // 靠点击而不是关键字，是因为一句话里出现地名太容易误判。
+                                sceneMovements.forEach { movement ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                if (movement.isLeave) {
+                                                    stringResource(
+                                                        R.string.group_chat_scene_leave_action,
+                                                        movement.name
+                                                    )
+                                                } else {
+                                                    stringResource(
+                                                        R.string.group_chat_scene_enter_action,
+                                                        movement.name
+                                                    )
+                                                }
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = if (movement.isLeave) {
+                                                    Icons.Rounded.Logout
+                                                } else {
+                                                    Icons.Rounded.Place
+                                                },
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onSwitchScene(movement.sceneId)
+                                        }
+                                    )
+                                }
                                 // 自主动作放进来（环顾四周、叹气这类）；
                                 // 带 {name} 的需要指定对象，群里没有天然对象，
                                 // 那类走长按成员头像，目标由手指决定不会错。

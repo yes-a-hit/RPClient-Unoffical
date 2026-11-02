@@ -178,4 +178,34 @@ class GroupChatScenesTest {
         assertTrue(scene.lorebookEntryIds.isEmpty())
         assertTrue(!scene.restrictsLorebook)
     }
+
+    @Test
+    fun `没有激活场景时只给出进入动作`() {
+        val scenes = listOf(
+            GroupChatScene(id = "a", name = "厨房"),
+            GroupChatScene(id = "b", name = "客厅")
+        )
+        val movements = GroupChatScenes.movements(scenes, "")
+        assertEquals(listOf("a", "b"), movements.map { it.sceneId })
+        assertTrue(movements.none { it.isLeave })
+    }
+
+    @Test
+    fun `已经在某个场景时多一条回到全员并且不再列自己`() {
+        val scenes = listOf(
+            GroupChatScene(id = "a", name = "厨房"),
+            GroupChatScene(id = "b", name = "客厅")
+        )
+        val movements = GroupChatScenes.movements(scenes, "a")
+        // 在厨房里还能去客厅，但「去厨房」不该出现；退出去向用空 id 表示
+        assertEquals(listOf("b", ""), movements.map { it.sceneId })
+        val leave = movements.single { it.isLeave }
+        assertEquals("厨房", leave.name)
+    }
+
+    @Test
+    fun `一个场景都没有时不产生任何动作`() {
+        assertTrue(GroupChatScenes.movements(emptyList(), "").isEmpty())
+        assertTrue(GroupChatScenes.movements(emptyList(), "a").isEmpty())
+    }
 }

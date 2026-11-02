@@ -1546,4 +1546,6 @@
     <string name="poke_actions_session_own">"Uniquement dans ce chat"</string>
     <string name="poke_actions_session_inherit">"Suit les valeurs globales"</string>
     <string name="poke_actions_follow_global">"Revenir aux valeurs globales"</string>
+    <string name="group_chat_scene_enter_action">Aller vers %1$s</string>
+    <string name="group_chat_scene_leave_action">Quitter %1$s et revenir à tous</string>
 </resources>

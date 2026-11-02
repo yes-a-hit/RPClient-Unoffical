@@ -1598,4 +1598,6 @@
     <string name="poke_actions_session_own">"In this chat only"</string>
     <string name="poke_actions_session_inherit">"Following the global defaults"</string>
     <string name="poke_actions_follow_global">"Follow global defaults"</string>
+    <string name="group_chat_scene_enter_action">Go to %1$s</string>
+    <string name="group_chat_scene_leave_action">Leave %1$s and rejoin everyone</string>
 </resources>

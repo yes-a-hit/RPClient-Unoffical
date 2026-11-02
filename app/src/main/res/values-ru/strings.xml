@@ -1550,4 +1550,6 @@
     <string name="poke_actions_session_own">"Только в этом чате"</string>
     <string name="poke_actions_session_inherit">"Используются глобальные настройки"</string>
     <string name="poke_actions_follow_global">"Вернуть глобальные настройки"</string>
+    <string name="group_chat_scene_enter_action">Перейти в %1$s</string>
+    <string name="group_chat_scene_leave_action">Покинуть %1$s и вернуться ко всем</string>
 </resources>

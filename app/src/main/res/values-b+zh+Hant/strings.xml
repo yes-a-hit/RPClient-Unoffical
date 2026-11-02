@@ -1540,4 +1540,6 @@
     <string name="poke_actions_session_own">"本會話單獨設定"</string>
     <string name="poke_actions_session_inherit">"目前跟隨全域預設"</string>
     <string name="poke_actions_follow_global">"恢復跟隨全域"</string>
+    <string name="group_chat_scene_enter_action">去「%1$s」</string>
+    <string name="group_chat_scene_leave_action">離開「%1$s」，回到全員</string>
 </resources>

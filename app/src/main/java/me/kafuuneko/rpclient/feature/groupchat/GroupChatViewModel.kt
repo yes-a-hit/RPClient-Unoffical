@@ -775,8 +775,7 @@ class GroupChatViewModel :
         refreshState(inputDraft = "")
     }
 
-    /** 点场景标签切换；传 null 回到不限场景。 */
-    @UiIntentObserver(GroupChatUiIntent.SwitchScene::class)
+    /** 点场景标签切换；传 null 回到不限场景。 */    @UiIntentObserver(GroupChatUiIntent.SwitchScene::class)
     private suspend fun onSwitchScene(intent: GroupChatUiIntent.SwitchScene) {
         val sessionId = mSessionId ?: return
         val target = intent.sceneId
@@ -3038,7 +3037,11 @@ class GroupChatViewModel :
             hasAvailableProvider = hasAvailableProvider,
             dialogState = dialogState,
             scenes = sceneItems,
-            activeSceneId = data.session.activeSceneId
+            activeSceneId = data.session.activeSceneId,
+            sceneMovements = GroupChatScenes.movements(
+                scenes = GroupChatScenes.decode(data.session.scenesJson),
+                activeSceneId = data.session.activeSceneId
+            )
         )
     }
 

@@ -1546,4 +1546,6 @@ Buka Pengaturan Model untuk memeriksa kunci API, URL dasar, nama model, dan izin
     <string name="poke_actions_session_own">"Hanya di chat ini"</string>
     <string name="poke_actions_session_inherit">"Mengikuti pengaturan global"</string>
     <string name="poke_actions_follow_global">"Kembali ke pengaturan global"</string>
+    <string name="group_chat_scene_enter_action">Pergi ke %1$s</string>
+    <string name="group_chat_scene_leave_action">Keluar dari %1$s dan kembali ke semua</string>
 </resources>

@@ -131,4 +131,22 @@ object GroupChatScenes {
             characterIds = characterIds,
             lorebookEntryIds = lorebookEntryIds
         )
+
+    /**
+     * 「+」菜单里的场景行动：进哪个、或者回到全员。
+     *
+     * 进出场景走显式动作而不是关键字匹配——一句话里出现地名太容易误判，
+     * 角色说「厨房里好像有动静」也会被当成要进厨房。
+     */
+    fun movements(scenes: List<GroupChatScene>, activeSceneId: String?): List<SceneMovement> {
+        val active = active(scenes, activeSceneId)
+        val enter = scenes
+            .filter { it.id != active?.id }
+            .map { SceneMovement(sceneId = it.id, name = it.name, isLeave = false) }
+        if (active == null) return enter
+        return enter + SceneMovement(sceneId = "", name = active.name, isLeave = true)
+    }
+
+    /** 一条可执行的动作：进某个场景，或者从当前场景退回全员。 */
+    data class SceneMovement(val sceneId: String, val name: String, val isLeave: Boolean)
 }

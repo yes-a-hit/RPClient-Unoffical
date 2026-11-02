@@ -1549,4 +1549,6 @@ Abra as Configurações de Modelo para verificar a chave de API, a URL base, o n
     <string name="poke_actions_session_own">"Somente neste chat"</string>
     <string name="poke_actions_session_inherit">"Seguindo os padrões globais"</string>
     <string name="poke_actions_follow_global">"Voltar aos padrões globais"</string>
+    <string name="group_chat_scene_enter_action">Ir para %1$s</string>
+    <string name="group_chat_scene_leave_action">Sair de %1$s e voltar a todos</string>
 </resources>

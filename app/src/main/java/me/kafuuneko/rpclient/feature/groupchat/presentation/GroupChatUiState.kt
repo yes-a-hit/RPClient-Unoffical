@@ -55,7 +55,14 @@ sealed class GroupChatUiState {
         /** 当前生效的场景 ID；空表示不限场景，全员在场。 */
         val activeSceneId: String = "",
         /** 图库挑选对话框是否打开。 */
-        val galleryPickerVisible: Boolean = false
+        val galleryPickerVisible: Boolean = false,
+        /**
+         * 「+」菜单里可以点的场景移动：进哪个场景、或者从当前场景退回全员。
+         *
+         * 只放动作不放关键字——自然语言里出现地名太容易误判，
+         * 进出场景必须是一次明确的点击。
+         */
+        val sceneMovements: List<me.kafuuneko.rpclient.libs.groupchat.GroupChatScenes.SceneMovement> = emptyList()
     ) : GroupChatUiState()
 
     data class Finished(val previous: GroupChatUiState) : GroupChatUiState()
