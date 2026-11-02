@@ -278,6 +278,16 @@ private fun GroupChatNormalView(
                     }
                 }
                 MessageImageViewerDialog(state.imageState) { emitIntent(GroupChatUiIntent.ImageAction(it)) }
+                // 「+」里只放不指向任何人的动作，带 {name} 的留给长按成员卡
+                val selfActions = remember(state.settingsState.pokeActions) {
+                    me.kafuuneko.rpclient.libs.poke.PokeActions.selfDirected(
+                        state.settingsState.pokeActions.ifEmpty {
+                            me.kafuuneko.rpclient.libs.poke.PokeActions.parse(
+                                me.kafuuneko.rpclient.libs.AppModel.pokeActions
+                            )
+                        }
+                    )
+                }
                 Composer(
                     draft = state.conversationState.inputDraft,
                     generating = generating,
@@ -290,6 +300,10 @@ private fun GroupChatNormalView(
                     onImageAction = { emitIntent(GroupChatUiIntent.ImageAction(it)) },
                     onOpenFilePicker = { emitIntent(GroupChatUiIntent.OpenFilePicker) },
                     onOpenGalleryPicker = { emitIntent(GroupChatUiIntent.OpenGalleryPicker) },
+                    onPerformSelfAction = {
+                        emitIntent(GroupChatUiIntent.PerformSelfAction(it))
+                    },
+                    selfActions = selfActions,
                     documents = state.conversationState.attachedDocuments,
                     onRemoveDocument = {
                         emitIntent(GroupChatUiIntent.RemoveAttachedDocument(it))
@@ -2162,6 +2176,8 @@ private fun Composer(
     onImageAction: (MessageImageAction) -> Unit,
     onOpenFilePicker: () -> Unit,
     onOpenGalleryPicker: () -> Unit,
+    onPerformSelfAction: (String) -> Unit,
+    selfActions: List<me.kafuuneko.rpclient.libs.poke.PokeAction>,
     documents: List<me.kafuuneko.rpclient.libs.media.AttachedDocument>,
     onRemoveDocument: (Int) -> Unit,
     canContinue: Boolean,
@@ -2311,9 +2327,24 @@ private fun Composer(
                                         onOpenGalleryPicker()
                                     }
                                 )
-                                // 动作不放进「+」：群聊里没有天然的动作对象，
-                                // 落到「最近发言的人」经常不是你心里那个人。
-                                // 改成长按成员头像触发，目标由手指决定，不会错。
+                                // 自主动作放进来（环顾四周、叹气这类）；
+                                // 带 {name} 的需要指定对象，群里没有天然对象，
+                                // 那类走长按成员头像，目标由手指决定不会错。
+                                selfActions.forEach { action ->
+                                    DropdownMenuItem(
+                                        text = { Text(action.label) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Rounded.TouchApp,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onPerformSelfAction(action.id)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }

@@ -32,6 +32,15 @@ val DEFAULT_PROMPT_MACROS = listOf("{{char}}", "{{user}}", "{{original}}", "{{la
 val DIALOGUE_EXAMPLE_MACROS = listOf("<START>", "{{char}}", "{{user}}")
 
 /**
+ * 只认人称占位符的宏列表。
+ *
+ * 角色扩展档案（年龄、经历、边界、好恶）是静态设定，写进去就固定了，
+ * `{{original}}`、`{{lastMessage}}` 这类运行时变量在那里永远取不到值——
+ * 摆出来只会让人插进去再看着它变成空字符串。
+ */
+val PLACEHOLDER_ONLY_MACROS = listOf("{{char}}", "{{user}}")
+
+/**
  * 现代化 Prompt / 文本宏变量快捷插入与全屏工具栏。
  *
  * 紧贴于多行 Prompt 输入框上方或下方，提供一键插入 {{char}} / {{user}} / <START> 等能力。

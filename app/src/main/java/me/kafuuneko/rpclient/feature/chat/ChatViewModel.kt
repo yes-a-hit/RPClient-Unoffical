@@ -275,35 +275,66 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             mImageCoordinator.handle(MessageImageAction.Picked(images))
         }
         val documents = intent.uris.filterNot { isImageUri(it) }
-        if (documents.isEmpty()) return
+        if (documents.isEmpty()) {
+            // 全都当成图片走掉了，或者是空选择：两种情况都不该静默
+            AppViewEvent.PopupToastMessage(
+                "选了 " + intent.uris.size + " 个，没有可当文档读的（图片 " + images.size + " 个）"
+            ).tryEmit()
+            return
+        }
         val read: List<AttachedDocument> = withContext(Dispatchers.IO) {
             documents.mapNotNull { uri ->
-                val name = displayNameOf(uri) ?: "未命名文件"
-                // docx 是 zip，当文本读只会得到乱码，单独抽正文
-                val text = if (DocumentText.isDocx(name)) {
-                    DocumentText.readDocx(mContext.contentResolver, uri)
-                } else {
-                    readTextFileContent(uri)
-                }
-                text?.takeIf { it.isNotBlank() }?.let {
-                    AttachedDocument(id = DocumentStore.newId(), name = name, text = it)
-                }
+                // 单个文件读失败不能带走整批：选择器回来的一批里有坏文件时，
+                // 抛出去会让整个意图中断，表现成「选完什么都没发生」
+                runCatching {
+                    val name = displayNameOf(uri) ?: "未命名文件"
+                    // docx 是 zip，当文本读只会得到乱码，单独抽正文
+                    val text = if (DocumentText.isDocx(name)) {
+                        DocumentText.readDocx(mContext.contentResolver, uri)
+                    } else {
+                        readTextFileContent(uri)
+                    }
+                    text?.takeIf { it.isNotBlank() }?.let {
+                        AttachedDocument(id = DocumentStore.newId(), name = name, text = it)
+                    }
+                }.onFailure {
+                    android.util.Log.w("ChatDoc", "读取失败：" + uri, it)
+                }.getOrNull()
             }
         }
         if (read.isEmpty()) {
             // 读不出文字时留一条日志：空白界面最难查，至少能从 logcat 看出是这一步挡的
             android.util.Log.w("ChatDoc", "附加文件没有产生任何文档：uris=" + intent.uris.size)
-            AppViewEvent.PopupToastMessage(mContext.getString(R.string.attach_file_unsupported)).tryEmit()
+            AppViewEvent.PopupToastMessage(
+                mContext.getString(R.string.attach_file_unsupported) +
+                    "（选中 " + documents.size + " 个，都读不出正文）"
+            ).tryEmit()
             return
         }
         android.util.Log.d("ChatDoc", "附加文件 " + read.size + " 份：" + read.joinToString { it.name + "(" + it.charCount + "字)" })
-        // 正文先落盘，消息体里只留引用：气泡干净，撤掉附件时文件也还在库里
-        withContext(Dispatchers.IO) { read.forEach { mDocumentStore.save(it) } }
+        // 正文先落盘，消息体里只留引用：气泡干净，撤掉附件时文件也还在库里。
+        // 落盘失败不能连累整条链路——磁盘满、目录被删都会抛，
+        // 抛出去就变成「点了没反应」，比丢一份正文难受得多。
+        val saved = withContext(Dispatchers.IO) {
+            read.mapNotNull { document ->
+                runCatching { mDocumentStore.save(document) }
+                    .onFailure { android.util.Log.w("ChatDoc", "文档落盘失败：" + document.name, it) }
+                    .getOrNull()
+            }
+        }
+        if (saved.isEmpty()) {
+            AppViewEvent.PopupToastMessage(mContext.getString(R.string.attach_file_unsupported)).tryEmit()
+            return
+        }
         uiState.copy(
             conversationState = uiState.conversationState.copy(
-                attachedDocuments = uiState.conversationState.attachedDocuments + read
+                attachedDocuments = uiState.conversationState.attachedDocuments + saved
             )
         ).setup()
+        // 明确回执：附件条是有还是没，一眼能分清是「没读到」还是「读到了没显示」
+        AppViewEvent.PopupToastMessage(
+            "已附加 " + saved.size + " 份：" + saved.joinToString("、") { it.name }
+        ).tryEmit()
     }
 
     /** 撤掉一份文档附件。 */

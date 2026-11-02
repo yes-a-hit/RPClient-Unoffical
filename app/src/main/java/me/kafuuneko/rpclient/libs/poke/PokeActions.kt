@@ -70,6 +70,16 @@ object PokeActions {
     fun render(action: PokeAction, name: String): String =
         action.template.replace("{name}", name)
 
+    /**
+     * 不指向具体对象的动作。
+     *
+     * 群聊的「+」里没有「对谁」这一层，带 `{name}` 的动作放进去只能随便挑一个人，
+     * 点「捏脸」却捏到刚说话的陌生人——所以群里只放这类自主动作（环顾四周、叹气），
+     * 想指名就长按成员卡。
+     */
+    fun selfDirected(actions: List<PokeAction>): List<PokeAction> =
+        actions.filter { !it.template.contains("{name}") }
+
     private fun JsonObject.stringOrNull(key: String): String? =
         get(key)?.takeIf { it.isJsonPrimitive }?.asString?.takeIf { it.isNotBlank() }
 }

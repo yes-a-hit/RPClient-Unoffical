@@ -258,7 +258,8 @@ class GroupChatViewModel :
     }
 
     @UiIntentObserver(GroupChatUiIntent.FilesPicked::class)
-    private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+    private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
         // 文件选择器不限类型，用户可能顺手选了图；先分出来走图片，别当文本读
         val images = intent.uris.filter { isImageUri(it) }
         if (images.isNotEmpty()) {
@@ -273,19 +274,24 @@ class GroupChatViewModel :
         // 只存文件名与正文，UI 显示成一条可删的附件，发送时再拼进消息。
         val read: List<me.kafuuneko.rpclient.libs.media.AttachedDocument> = withContext(Dispatchers.IO) {
             documents.mapNotNull { uri ->
-                val name = displayNameOf(uri) ?: "未命名文件"
-                val text = if (DocumentText.isDocx(name)) {
-                    DocumentText.readDocx(mContext.contentResolver, uri)
-                } else {
-                    readTextFileContent(uri)
-                }
-                text?.takeIf { it.isNotBlank() }?.let {
-                    me.kafuuneko.rpclient.libs.media.AttachedDocument(
-                        id = me.kafuuneko.rpclient.libs.media.DocumentStore.newId(),
-                        name = name,
-                        text = it
-                    )
-                }
+                // 单个文件读失败不能带走整批，否则整条意图中断、表现成「什么都没发生」
+                runCatching {
+                    val name = displayNameOf(uri) ?: "未命名文件"
+                    val text = if (DocumentText.isDocx(name)) {
+                        DocumentText.readDocx(mContext.contentResolver, uri)
+                    } else {
+                        readTextFileContent(uri)
+                    }
+                    text?.takeIf { it.isNotBlank() }?.let {
+                        me.kafuuneko.rpclient.libs.media.AttachedDocument(
+                            id = me.kafuuneko.rpclient.libs.media.DocumentStore.newId(),
+                            name = name,
+                            text = it
+                        )
+                    }
+                }.onFailure {
+                    android.util.Log.w("ChatDoc", "读取失败：" + uri, it)
+                }.getOrNull()
             }
         }
         if (read.isEmpty()) {
@@ -294,11 +300,24 @@ class GroupChatViewModel :
             ).tryEmit()
             return
         }
-        // 正文先落盘：消息体里只留引用，气泡才不会被几万字撑开
-        withContext(Dispatchers.IO) { read.forEach { mDocumentStore.save(it) } }
+        // 正文先落盘：消息体里只留引用，气泡才不会被几万字撑开。
+        // 落盘失败不能连累整条链路，否则表现成「点了没反应」。
+        val saved = withContext(Dispatchers.IO) {
+            read.mapNotNull { document ->
+                runCatching { mDocumentStore.save(document) }
+                    .onFailure { android.util.Log.w("ChatDoc", "文档落盘失败：" + document.name, it) }
+                    .getOrNull()
+            }
+        }
+        if (saved.isEmpty()) {
+            AppViewEvent.PopupToastMessage(
+                mContext.getString(R.string.attach_file_unsupported)
+            ).tryEmit()
+            return
+        }
         uiState.copy(
             conversationState = uiState.conversationState.copy(
-                attachedDocuments = uiState.conversationState.attachedDocuments + read
+                attachedDocuments = uiState.conversationState.attachedDocuments + saved
             )
         ).setup()
     }
@@ -999,6 +1018,27 @@ class GroupChatViewModel :
      * `pokePrompt` 是动作系统上线前的老配置，只覆盖「戳一戳」这一条的措辞：
      * 用户当年填过就继续生效，不用逼他按新格式重填一遍。
      */
+    /**
+     * 做一个不指向任何人的动作。
+     *
+     * 和戳一戳同一条发送链路，区别只在于模板里没有 `{name}`——
+     * 群聊里「对谁做」没有明确对象，所以只放这类自主动作。
+     */
+    @UiIntentObserver(GroupChatUiIntent.PerformSelfAction::class)
+    private suspend fun onPerformSelfAction(intent: GroupChatUiIntent.PerformSelfAction) {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        if (!canPoke(uiState)) return
+        val action = loadPokeActions().firstOrNull { it.id == intent.actionId } ?: return
+        // 带 {name} 的动作在群聊里没有落点，静默忽略比随便挑一个人安全
+        if (action.template.contains("{name}")) return
+        val reaction = AppModel.pokeReaction.trim()
+        val text = if (reaction.isBlank()) action.template else action.template + "\n" + reaction
+        uiState.copy(
+            conversationState = uiState.conversationState.copy(inputDraft = text)
+        ).setup()
+        onSendMessage()
+    }
+
     private fun loadPokeActions(): List<PokeAction> {
         val stored = PokeActions.parse(AppModel.pokeActions)
         val legacy = AppModel.pokePrompt.trim()

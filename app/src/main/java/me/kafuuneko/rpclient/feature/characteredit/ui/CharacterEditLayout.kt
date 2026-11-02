@@ -95,6 +95,7 @@ import me.kafuuneko.rpclient.ui.theme.CharacterAccentColors
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
 import me.kafuuneko.rpclient.ui.widgets.DEFAULT_PROMPT_MACROS
 import me.kafuuneko.rpclient.ui.widgets.DIALOGUE_EXAMPLE_MACROS
+import me.kafuuneko.rpclient.ui.widgets.PLACEHOLDER_ONLY_MACROS
 import me.kafuuneko.rpclient.ui.widgets.RpAvatar
 import me.kafuuneko.rpclient.ui.widgets.RpChipInputField
 import me.kafuuneko.rpclient.ui.widgets.RpJsonCodeEditorField
@@ -573,6 +574,8 @@ private fun ProfileBackstoryPanel(
             label = stringResource(R.string.character_romantic_history),
             value = profile.romanticHistory,
             minLines = 3,
+            showMacroBar = true,
+            macros = PLACEHOLDER_ONLY_MACROS,
             onChange = {
                 CharacterEditUiIntent.ChangeProfileText(
                     CharacterProfileTextField.RomanticHistory,
@@ -594,6 +597,8 @@ private fun ProfileBackstoryPanel(
             label = stringResource(R.string.character_sexual_history),
             value = profile.sexualHistory,
             minLines = 3,
+            showMacroBar = true,
+            macros = PLACEHOLDER_ONLY_MACROS,
             onChange = {
                 CharacterEditUiIntent.ChangeProfileText(
                     CharacterProfileTextField.SexualHistory,
@@ -606,6 +611,8 @@ private fun ProfileBackstoryPanel(
             label = stringResource(R.string.character_boundaries),
             value = profile.boundaries,
             minLines = 2,
+            showMacroBar = true,
+            macros = PLACEHOLDER_ONLY_MACROS,
             onChange = {
                 CharacterEditUiIntent.ChangeProfileText(
                     CharacterProfileTextField.Boundaries,
@@ -618,6 +625,8 @@ private fun ProfileBackstoryPanel(
                 label = stringResource(R.string.character_likes),
                 value = profile.likes,
                 modifier = Modifier.weight(1f),
+                showMacroBar = true,
+                macros = PLACEHOLDER_ONLY_MACROS,
                 onChange = {
                     CharacterEditUiIntent.ChangeProfileText(
                         CharacterProfileTextField.Likes,
@@ -629,6 +638,8 @@ private fun ProfileBackstoryPanel(
                 label = stringResource(R.string.character_dislikes),
                 value = profile.dislikes,
                 modifier = Modifier.weight(1f),
+                showMacroBar = true,
+                macros = PLACEHOLDER_ONLY_MACROS,
                 onChange = {
                     CharacterEditUiIntent.ChangeProfileText(
                         CharacterProfileTextField.Dislikes,

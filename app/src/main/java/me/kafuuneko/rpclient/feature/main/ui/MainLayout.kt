@@ -1563,12 +1563,14 @@ private fun SettingsPage(
         }
         item { PromptPresetEntryCard { MainUiIntent.OpenPromptPreset.emit() } }
         item { PromptBehaviorPanel(state.promptBehaviorState, emit) }
+        // 动作配置放在这一组最上面：它属于「我怎么对待角色」，
+        // 埋在 SkillPanel 底下时主人根本找不到入口
+        item { PokeActionsPanel(state.pokeActionState, emit) }
         item { WorldInfoBudgetPanel(state.worldInfoBudgetState, emit) }
         item { SummaryPanel(state.summaryState, emit) }
         item { ImageSendPanel(state.imageSendState, emit) }
         item { ImageGenPanel(state.imageGenState, emit) }
         item { SkillPanel(state.skillState, emit) }
-        item { PokeActionsPanel(state.pokeActionState, emit) }
 
         // ================= 4. 数据与系统 =================
         item {

@@ -53,6 +53,9 @@ sealed class GroupChatUiIntent {
     /** 对某个成员做一个动作；长按头像触发，或从「+」菜单里选动作。 */
     data class PokeMember(val memberName: String, val actionId: String = "") : GroupChatUiIntent()
 
+    /** 做一个不指向任何人的动作（环顾四周、叹气这类），从「+」菜单里选。 */
+    data class PerformSelfAction(val actionId: String) : GroupChatUiIntent()
+
     /** 打开动作预设编辑框。 */
     data object OpenPokeActionEditor : GroupChatUiIntent()
 
