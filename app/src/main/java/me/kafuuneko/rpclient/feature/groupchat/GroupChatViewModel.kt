@@ -2757,6 +2757,8 @@ class GroupChatViewModel :
             getOrNull<GroupChatUiState.Normal>()?.conversationState?.editingMessageDraft.orEmpty(),
         dialogState: GroupChatDialogState =
             getOrNull<GroupChatUiState.Normal>()?.dialogState ?: GroupChatDialogState.None,
+        attachedDocuments: List<me.kafuuneko.rpclient.libs.media.AttachedDocument> =
+            getOrNull<GroupChatUiState.Normal>()?.conversationState?.attachedDocuments.orEmpty(),
         messageLimit: Int = getOrNull<GroupChatUiState.Normal>()
             ?.conversationState?.messages?.size
             ?.coerceAtLeast(MESSAGE_PAGE_SIZE)
@@ -2775,6 +2777,7 @@ class GroupChatViewModel :
                 editingMessageId = editingMessageId,
                 editingMessageDraft = editingMessageDraft,
                 dialogState = dialogState,
+                attachedDocuments = attachedDocuments,
                 messageLimit = messageLimit
             )
         } ?: return
@@ -2806,6 +2809,7 @@ class GroupChatViewModel :
         editingMessageId: Long? = null,
         editingMessageDraft: String = "",
         dialogState: GroupChatDialogState = GroupChatDialogState.None,
+        attachedDocuments: List<me.kafuuneko.rpclient.libs.media.AttachedDocument> = emptyList(),
         messageLimit: Int = MESSAGE_PAGE_SIZE
     ): GroupChatUiState.Normal? {
         // 查询群聊会话、成员与最近消息窗口
@@ -2915,7 +2919,9 @@ class GroupChatViewModel :
                 } else generationState,
                 expandedThinkBlockIds = expandedThinkBlockIds,
                 editingMessageId = editingMessageId,
-                editingMessageDraft = editingMessageDraft
+                editingMessageDraft = editingMessageDraft,
+                // 附件跟着输入区一起走，状态重建不能把它丢掉
+                attachedDocuments = attachedDocuments
             ),
             settingsState = GroupChatSettingsState(
                 activationStrategy = data.session.activationStrategy

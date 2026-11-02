@@ -291,9 +291,12 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             }
         }
         if (read.isEmpty()) {
+            // 读不出文字时留一条日志：空白界面最难查，至少能从 logcat 看出是这一步挡的
+            android.util.Log.w("ChatDoc", "附加文件没有产生任何文档：uris=" + intent.uris.size)
             AppViewEvent.PopupToastMessage(mContext.getString(R.string.attach_file_unsupported)).tryEmit()
             return
         }
+        android.util.Log.d("ChatDoc", "附加文件 " + read.size + " 份：" + read.joinToString { it.name + "(" + it.charCount + "字)" })
         // 正文随消息走，不再另存一份：气泡里由卡片收起，备份也带得走
         uiState.copy(
             conversationState = uiState.conversationState.copy(
@@ -774,7 +777,9 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
                 refreshUiState(
                     sessionId = sessionId,
                     inputDraft = "",
-                    generationState = ChatGenerationState.Requesting
+                    generationState = ChatGenerationState.Requesting,
+                    // 附件已经拼进这条消息了，输入区不能再挂一遍
+                    attachedDocuments = emptyList()
                 )
                 generateCommittedReply(sessionId)
                 // 检查并按需触发自动总结
@@ -2789,6 +2794,7 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         editingMessageId: String? = null,
         editingMessageDraft: String = "",
         dialogState: ChatDialogState = ChatDialogState.None,
+        attachedDocuments: List<AttachedDocument> = emptyList(),
         messageLimit: Int = MESSAGE_PAGE_SIZE
     ): ChatUiState.Normal? {
         // 查询会话基础数据、角色人设及最近消息窗口
@@ -2836,7 +2842,10 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
                 } else generationState,
                 expandedThinkBlockIds = expandedThinkBlockIds,
                 editingMessageId = editingMessageId,
-                editingMessageDraft = editingMessageDraft
+                editingMessageDraft = editingMessageDraft,
+                // 附件挂在输入框旁边，任何一次状态重建都要带着走，
+                // 否则收一条回复的工夫用户刚选的文件就没了
+                attachedDocuments = attachedDocuments
             ),
             lorebookState = lorebookData.toChatLorebookGroupItems(
                     enabledIds = enabledIds,
@@ -2932,6 +2941,8 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         editingMessageDraft: String = getOrNull<ChatUiState.Normal>()
             ?.conversationState?.editingMessageDraft.orEmpty(),
         dialogState: ChatDialogState = getOrNull<ChatUiState.Normal>()?.dialogState ?: ChatDialogState.None,
+        attachedDocuments: List<AttachedDocument> = getOrNull<ChatUiState.Normal>()
+            ?.conversationState?.attachedDocuments.orEmpty(),
         messageLimit: Int = getOrNull<ChatUiState.Normal>()
             ?.conversationState?.messages?.size
             ?.coerceAtLeast(MESSAGE_PAGE_SIZE)
@@ -2949,6 +2960,7 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
                 editingMessageId = editingMessageId,
                 editingMessageDraft = editingMessageDraft,
                 dialogState = dialogState,
+                attachedDocuments = attachedDocuments,
                 messageLimit = messageLimit
             )
         } ?: return
