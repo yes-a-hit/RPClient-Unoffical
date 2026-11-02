@@ -1534,4 +1534,9 @@
     <string name="poke_actions_template">Plantilla</string>
     <string name="poke_actions_need_one">Conserva al menos una acción</string>
     <string name="poke_actions_save">Guardar</string>
+    <string name="about_uv_badge">"No oficial"</string>
+    <string name="feedback_label_fork">"Comentarios de la bifurcación"</string>
+    <string name="feedback_desc_fork">"Los problemas de esta versión no oficial van aquí, no al original"</string>
+    <string name="github_repo_label_fork">"Repositorio de la bifurcación"</string>
+    <string name="developer_contact_fork">"Correo del autor de la bifurcación"</string>
 </resources>

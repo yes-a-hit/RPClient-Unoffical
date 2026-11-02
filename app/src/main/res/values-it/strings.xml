@@ -1511,4 +1511,9 @@ Apri le impostazioni del modello per verificare la chiave API, l\'URL di base, i
     <string name="poke_actions_template">Modello</string>
     <string name="poke_actions_need_one">"Mantieni almeno un'azione"</string>
     <string name="poke_actions_save">Salva</string>
+    <string name="about_uv_badge">"Non ufficiale"</string>
+    <string name="feedback_label_fork">"Feedback della versione modificata"</string>
+    <string name="feedback_desc_fork">"I problemi di questa versione non ufficiale vanno qui, non a monte"</string>
+    <string name="github_repo_label_fork">"Repository della versione modificata"</string>
+    <string name="developer_contact_fork">"Email dell'autore della versione modificata"</string>
 </resources>

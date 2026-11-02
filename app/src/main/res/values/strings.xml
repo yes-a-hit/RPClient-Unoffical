@@ -1585,4 +1585,9 @@
     <string name="poke_actions_template">Template</string>
     <string name="poke_actions_need_one">Keep at least one action</string>
     <string name="poke_actions_save">Save</string>
+    <string name="about_uv_badge">"Unoffical"</string>
+    <string name="feedback_label_fork">"Fork feedback"</string>
+    <string name="feedback_desc_fork">"Issues for this unofficial build go here, not to upstream"</string>
+    <string name="github_repo_label_fork">"Fork repository"</string>
+    <string name="developer_contact_fork">"Fork author email"</string>
 </resources>

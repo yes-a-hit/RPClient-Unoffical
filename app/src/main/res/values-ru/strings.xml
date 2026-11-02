@@ -1537,4 +1537,9 @@
     <string name="poke_actions_template">Шаблон</string>
     <string name="poke_actions_need_one">Оставьте хотя бы одно действие</string>
     <string name="poke_actions_save">Сохранить</string>
+    <string name="about_uv_badge">"Неофициальная"</string>
+    <string name="feedback_label_fork">"Отзывы о сборке"</string>
+    <string name="feedback_desc_fork">"Проблемы этой неофициальной сборки сообщайте сюда, а не в оригинал"</string>
+    <string name="github_repo_label_fork">"Репозиторий сборки"</string>
+    <string name="developer_contact_fork">"Почта автора сборки"</string>
 </resources>

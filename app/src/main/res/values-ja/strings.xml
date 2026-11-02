@@ -1528,4 +1528,9 @@
     <string name="poke_actions_template">テンプレート</string>
     <string name="poke_actions_need_one">アクションを1つ以上残してください</string>
     <string name="poke_actions_save">保存</string>
+    <string name="about_uv_badge">"非公式版"</string>
+    <string name="feedback_label_fork">"改変版のフィードバック"</string>
+    <string name="feedback_desc_fork">"この非公式版の問題はここへ。上流へは報告しないでください"</string>
+    <string name="github_repo_label_fork">"改変版リポジトリ"</string>
+    <string name="developer_contact_fork">"改変版作者のメール"</string>
 </resources>

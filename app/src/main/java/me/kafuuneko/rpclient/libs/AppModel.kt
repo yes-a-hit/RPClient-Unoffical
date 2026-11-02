@@ -15,11 +15,17 @@ import me.kafuuneko.rpclient.libs.theme.AppThemeMode
  * 这里只存放跨会话的全局设置和 Prompt 模板；角色、聊天及世界书等领域数据由 Room 管理。
  */
 object AppModel : KotprefModel(), PromptPreferences {
-    // 应用联系邮箱。
+    // 应用联系邮箱（上游作者）。
     const val EMAIL = "kafuuneko@gmail.com"
+
+    // 定制分支作者邮箱。
+    const val UV_EMAIL = "yes0a0hit@gmail.com"
 
     // 仓库地址。
     const val GITHUB_REPO = "https://github.com/KafuuNeko/RPClient"
+
+    // 定制分支仓库地址。
+    const val UV_GITHUB_REPO = "https://github.com/yes-a-hit/RPClient"
 
     // 默认美元兑人民币汇率，用于把美元报价折算成人民币展示。
     const val DEFAULT_USD_TO_CNY = "7.2"

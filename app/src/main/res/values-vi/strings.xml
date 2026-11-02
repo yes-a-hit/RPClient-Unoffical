@@ -1533,4 +1533,9 @@ Mở Cài đặt mô hình để kiểm tra khóa API, URL cơ sở, tên mô h�
     <string name="poke_actions_template">Mẫu</string>
     <string name="poke_actions_need_one">Giữ lại ít nhất một hành động</string>
     <string name="poke_actions_save">Lưu</string>
+    <string name="about_uv_badge">"Không chính thức"</string>
+    <string name="feedback_label_fork">"Phản hồi bản chỉnh sửa"</string>
+    <string name="feedback_desc_fork">"Sự cố của bản không chính thức này báo ở đây, không báo cho bản gốc"</string>
+    <string name="github_repo_label_fork">"Kho của bản chỉnh sửa"</string>
+    <string name="developer_contact_fork">"Email tác giả bản chỉnh sửa"</string>
 </resources>

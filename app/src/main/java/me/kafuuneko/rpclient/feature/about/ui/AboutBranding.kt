@@ -114,6 +114,16 @@ internal fun AboutHeroHeader(isDevelopmentBuild: Boolean) {
         ) {
             Text(stringResource(R.string.about_brand_name), style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold)
+            // 非官方分支必须自报身份，免得打分成问题报到上游去
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+                Text(stringResource(R.string.about_uv_badge),
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            }
             if (isDevelopmentBuild) {
                 Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary) {
                     Text(stringResource(R.string.about_dev_badge),
@@ -153,87 +163,5 @@ private fun AboutLogo() {
                 modifier = Modifier.padding(7.dp).size(72.dp).clip(RoundedCornerShape(18.dp))
             )
         }
-    }
-}
-
-/** 渐变评分卡在宽屏横向展开，手机上将说明与行动分行以保留可读性。 */
-@Composable
-internal fun AboutRatingCard(onRateApp: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    // 金色到蓝色的边框呼应评分与品牌；内部颜色继续跟随主题。
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = colors.surface,
-        border = BorderStroke(1.dp, Brush.linearGradient(
-            listOf(AccentAmberColor.copy(alpha = 0.6f), colors.primary.copy(alpha = 0.45f))
-        ))
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxWidth().background(Brush.linearGradient(
-                listOf(AccentAmberColor.copy(alpha = 0.1f), colors.primary.copy(alpha = 0.12f))
-            )).padding(16.dp)
-        ) {
-            val wide = maxWidth / LocalDensity.current.fontScale >= 520.dp
-            if (wide) {
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AboutStars()
-                    AboutRatingCopy(Modifier.weight(1f))
-                    AboutRateButton(onRateApp)
-                }
-            } else if (maxWidth / LocalDensity.current.fontScale >= 300.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AboutStars()
-                        AboutRatingCopy()
-                    }
-                    AboutRateButton(onRateApp)
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AboutStars()
-                    AboutRatingCopy()
-                    AboutRateButton(onRateApp, Modifier.align(Alignment.End))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AboutStars() {
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        repeat(5) {
-            Icon(Icons.Rounded.Star, contentDescription = null, tint = AccentAmberColor,
-                modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-@Composable
-private fun AboutRatingCopy(modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(stringResource(R.string.rate_card_title), style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.rate_card_desc), style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun AboutRateButton(onRateApp: () -> Unit, modifier: Modifier = Modifier) {
-    // 背景独立绘制渐变，仍使用标准 Button 提供触摸尺寸、焦点和点击反馈。
-    Button(
-        onClick = onRateApp,
-        modifier = modifier.clip(RoundedCornerShape(14.dp)).background(
-            Brush.horizontalGradient(listOf(AccentVioletColor, MaterialTheme.colorScheme.primary))
-        ),
-        shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White)
-    ) {
-        Text(stringResource(R.string.about_rate_action), fontWeight = FontWeight.SemiBold)
-        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null,
-            modifier = Modifier.padding(start = 6.dp).size(18.dp))
     }
 }

@@ -1533,4 +1533,9 @@
     <string name="poke_actions_template">Modèle</string>
     <string name="poke_actions_need_one">Gardez au moins une action</string>
     <string name="poke_actions_save">Enregistrer</string>
+    <string name="about_uv_badge">"Non officielle"</string>
+    <string name="feedback_label_fork">"Retour sur la version modifiée"</string>
+    <string name="feedback_desc_fork">"Les problèmes de cette version non officielle se signalent ici, pas en amont"</string>
+    <string name="github_repo_label_fork">"Dépôt de la version modifiée"</string>
+    <string name="developer_contact_fork">"E-mail de l'auteur de la version modifiée"</string>
 </resources>

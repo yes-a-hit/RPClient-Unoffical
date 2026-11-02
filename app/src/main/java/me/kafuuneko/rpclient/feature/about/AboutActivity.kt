@@ -61,7 +61,11 @@ class AboutActivity : CoreActivity() {
                 githubRepoUrl = AppModel.GITHUB_REPO,
                 githubRepoName = "KafuuNeko/RPClient",
                 developerEmail = AppModel.EMAIL,
-                githubIssuesUrl = "${AppModel.GITHUB_REPO}/issues"
+                githubIssuesUrl = "${AppModel.GITHUB_REPO}/issues",
+                forkRepoUrl = AppModel.UV_GITHUB_REPO,
+                forkRepoName = "yes-a-hit/RPClient",
+                forkEmail = AppModel.UV_EMAIL,
+                forkIssuesUrl = "${AppModel.UV_GITHUB_REPO}/issues"
             )
         }
 
@@ -72,8 +76,10 @@ class AboutActivity : CoreActivity() {
                 onBack = { finish() },
                 onCopyDeveloperEmail = { copyDeveloperEmail(uiState.developerEmail) },
                 onOpenRepository = { safeOpenUrl(uiState.githubRepoUrl) },
-                onRateApp = { openGooglePlay() },
+                onOpenForkRepository = { safeOpenUrl(uiState.forkRepoUrl) },
                 onOpenFeedback = { safeOpenUrl(uiState.githubIssuesUrl) },
+                onOpenForkFeedback = { safeOpenUrl(uiState.forkIssuesUrl) },
+                onCopyForkEmail = { copyDeveloperEmail(uiState.forkEmail) },
                 onDownloadReadme = { mReadmeSaver.launch(AppModel.UV_README_FILE_NAME) }
             )
         }
@@ -93,26 +99,6 @@ class AboutActivity : CoreActivity() {
             R.string.copied_to_clipboard,
             Toast.LENGTH_SHORT
         ).show()
-    }
-
-    /** 打开 Google Play 商店评价页面，缺失对应市场应用时平滑降级至网页版。 */
-    private fun openGooglePlay() {
-        val pkg = packageName
-        val playStoreIntent = Intent(
-            Intent.ACTION_VIEW,
-            "market://details?id=$pkg".toUri()
-        ).apply {
-            setPackage("com.android.vending")
-        }
-        try {
-            startActivity(playStoreIntent)
-        } catch (_: ActivityNotFoundException) {
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, "market://details?id=$pkg".toUri()))
-            } catch (_: ActivityNotFoundException) {
-                safeOpenUrl("https://play.google.com/store/apps/details?id=$pkg")
-            }
-        }
     }
 
     /** 安全打开外部超链接，若无可用浏览器则回退至复制链接到剪贴板。 */

@@ -48,8 +48,10 @@ fun AboutLayout(
     onBack: () -> Unit,
     onCopyDeveloperEmail: () -> Unit,
     onOpenRepository: () -> Unit,
-    onRateApp: () -> Unit,
+    onOpenForkRepository: () -> Unit,
     onOpenFeedback: () -> Unit,
+    onOpenForkFeedback: () -> Unit,
+    onCopyForkEmail: () -> Unit,
     onDownloadReadme: () -> Unit
 ) {
     // 装饰与正文共享背景，系统栏和内容避让仍由 Scaffold 处理。
@@ -63,8 +65,10 @@ fun AboutLayout(
                 uiState = uiState,
                 onCopyDeveloperEmail = onCopyDeveloperEmail,
                 onOpenRepository = onOpenRepository,
-                onRateApp = onRateApp,
+                onOpenForkRepository = onOpenForkRepository,
                 onOpenFeedback = onOpenFeedback,
+                onOpenForkFeedback = onOpenForkFeedback,
+                onCopyForkEmail = onCopyForkEmail,
                 onDownloadReadme = onDownloadReadme,
                 modifier = Modifier.padding(paddingValues)
             )
@@ -77,8 +81,10 @@ private fun AboutViewContent(
     uiState: AboutUiState,
     onCopyDeveloperEmail: () -> Unit,
     onOpenRepository: () -> Unit,
-    onRateApp: () -> Unit,
+    onOpenForkRepository: () -> Unit,
     onOpenFeedback: () -> Unit,
+    onOpenForkFeedback: () -> Unit,
+    onCopyForkEmail: () -> Unit,
     onDownloadReadme: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -96,10 +102,22 @@ private fun AboutViewContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             AboutHeroHeader(uiState.appInfo.isDevelopmentBuild)
-            AboutRatingCard(onRateApp)
             AboutCustomSection(uiState.appInfo.versionName, onDownloadReadme)
-            AboutCommunitySection(uiState.githubRepoName, onOpenFeedback, onOpenRepository)
-            AboutSupportSection(uiState.developerEmail, onCopyDeveloperEmail, onOpenRepository)
+            AboutCommunitySection(
+                repoName = uiState.githubRepoName,
+                forkRepoName = uiState.forkRepoName,
+                onOpenFeedback = onOpenFeedback,
+                onOpenForkFeedback = onOpenForkFeedback,
+                onOpenRepository = onOpenRepository,
+                onOpenForkRepository = onOpenForkRepository
+            )
+            AboutSupportSection(
+                developerEmail = uiState.developerEmail,
+                forkEmail = uiState.forkEmail,
+                onCopyDeveloperEmail = onCopyDeveloperEmail,
+                onCopyForkEmail = onCopyForkEmail,
+                onOpenRepository = onOpenRepository
+            )
             AboutAppInfoSection(uiState.appInfo)
             AboutFooter()
         }
@@ -146,10 +164,13 @@ private fun AboutCustomSection(
 @Composable
 private fun AboutCommunitySection(
     repoName: String,
+    forkRepoName: String,
     onOpenFeedback: () -> Unit,
-    onOpenRepository: () -> Unit
+    onOpenForkFeedback: () -> Unit,
+    onOpenRepository: () -> Unit,
+    onOpenForkRepository: () -> Unit
 ) {
-    // 统一外链尾标，保留现有反馈与仓库跳转行为。
+    // 上游与本分支并列：有问题先分清楚该报给谁
     AboutSection(stringResource(R.string.section_community)) {
         AboutActionRow(
             icon = Icons.Rounded.BugReport,
@@ -162,13 +183,33 @@ private fun AboutCommunitySection(
         )
         AboutDivider()
         AboutActionRow(
-            icon = Icons.Rounded.Code,
+            icon = Icons.Rounded.BugReport,
             accent = AccentVioletColor,
+            title = stringResource(R.string.feedback_label_fork),
+            subtitle = stringResource(R.string.feedback_desc_fork),
+            action = stringResource(R.string.about_github),
+            actionIcon = Icons.AutoMirrored.Rounded.OpenInNew,
+            onClick = onOpenForkFeedback
+        )
+        AboutDivider()
+        AboutActionRow(
+            icon = Icons.Rounded.Code,
+            accent = MaterialTheme.colorScheme.secondary,
             title = stringResource(R.string.github_repo_label),
             subtitle = repoName,
             action = stringResource(R.string.about_github),
             actionIcon = Icons.AutoMirrored.Rounded.OpenInNew,
             onClick = onOpenRepository
+        )
+        AboutDivider()
+        AboutActionRow(
+            icon = Icons.Rounded.Code,
+            accent = AccentVioletColor,
+            title = stringResource(R.string.github_repo_label_fork),
+            subtitle = forkRepoName,
+            action = stringResource(R.string.about_github),
+            actionIcon = Icons.AutoMirrored.Rounded.OpenInNew,
+            onClick = onOpenForkRepository
         )
     }
 }
@@ -176,7 +217,9 @@ private fun AboutCommunitySection(
 @Composable
 private fun AboutSupportSection(
     developerEmail: String,
+    forkEmail: String,
     onCopyDeveloperEmail: () -> Unit,
+    onCopyForkEmail: () -> Unit,
     onOpenRepository: () -> Unit
 ) {
     // 邮箱置于副标题，尾部仅保留短操作标签，避免小屏被长地址挤压。
@@ -190,6 +233,17 @@ private fun AboutSupportSection(
             actionIcon = Icons.Rounded.ContentCopy,
             pillAction = true,
             onClick = onCopyDeveloperEmail
+        )
+        AboutDivider()
+        AboutActionRow(
+            icon = Icons.Rounded.Email,
+            accent = AccentVioletColor,
+            title = stringResource(R.string.developer_contact_fork),
+            subtitle = forkEmail,
+            action = stringResource(R.string.copy),
+            actionIcon = Icons.Rounded.ContentCopy,
+            pillAction = true,
+            onClick = onCopyForkEmail
         )
         AboutDivider()
         AboutActionRow(
@@ -253,13 +307,18 @@ private fun AboutPreviewContent() {
             appInfo = AboutAppInfoState("2026.2.3-dev", "20260203", true),
             githubRepoUrl = "https://github.com/KafuuNeko/RPClient",
             githubRepoName = "KafuuNeko/RPClient",
-            developerEmail = "developer@example.com"
+            developerEmail = "kafuuneko@gmail.com",
+            forkRepoUrl = "https://github.com/yes-a-hit/RPClient",
+            forkRepoName = "yes-a-hit/RPClient",
+            forkEmail = "yes0a0hit@gmail.com"
         ),
         onBack = {},
         onCopyDeveloperEmail = {},
         onOpenRepository = {},
-        onRateApp = {},
+        onOpenForkRepository = {},
         onOpenFeedback = {},
+        onOpenForkFeedback = {},
+        onCopyForkEmail = {},
         onDownloadReadme = {}
     )
 }

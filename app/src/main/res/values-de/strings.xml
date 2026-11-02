@@ -1532,4 +1532,9 @@
     <string name="poke_actions_template">Vorlage</string>
     <string name="poke_actions_need_one">Mindestens eine Aktion behalten</string>
     <string name="poke_actions_save">Speichern</string>
+    <string name="about_uv_badge">"Inoffiziell"</string>
+    <string name="feedback_label_fork">"Feedback zum Fork"</string>
+    <string name="feedback_desc_fork">"Probleme dieser inoffiziellen Version gehören hierher, nicht zum Original"</string>
+    <string name="github_repo_label_fork">"Fork-Repository"</string>
+    <string name="developer_contact_fork">"E-Mail des Fork-Autors"</string>
 </resources>

@@ -1527,4 +1527,9 @@
     <string name="poke_actions_template">模板</string>
     <string name="poke_actions_need_one">至少要保留一个动作</string>
     <string name="poke_actions_save">保存</string>
+    <string name="about_uv_badge">"非官方版"</string>
+    <string name="feedback_label_fork">"定制分支反馈"</string>
+    <string name="feedback_desc_fork">"本非官方版本的问题请报到这里，不要报给上游"</string>
+    <string name="github_repo_label_fork">"定制分支仓库"</string>
+    <string name="developer_contact_fork">"定制分支作者邮箱"</string>
 </resources>

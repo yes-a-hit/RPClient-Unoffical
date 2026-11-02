@@ -1527,4 +1527,9 @@
     <string name="poke_actions_template">템플릿</string>
     <string name="poke_actions_need_one">동작을 하나 이상 남겨 두세요</string>
     <string name="poke_actions_save">저장</string>
+    <string name="about_uv_badge">"비공식판"</string>
+    <string name="feedback_label_fork">"수정판 피드백"</string>
+    <string name="feedback_desc_fork">"이 비공식판의 문제는 여기에 보고하세요. 원본에 보고하지 마세요"</string>
+    <string name="github_repo_label_fork">"수정판 저장소"</string>
+    <string name="developer_contact_fork">"수정판 제작자 이메일"</string>
 </resources>

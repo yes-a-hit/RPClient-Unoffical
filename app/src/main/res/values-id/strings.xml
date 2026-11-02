@@ -1533,4 +1533,9 @@ Buka Pengaturan Model untuk memeriksa kunci API, URL dasar, nama model, dan izin
     <string name="poke_actions_template">Templat</string>
     <string name="poke_actions_need_one">Sisakan setidaknya satu aksi</string>
     <string name="poke_actions_save">Simpan</string>
+    <string name="about_uv_badge">"Tidak resmi"</string>
+    <string name="feedback_label_fork">"Umpan balik versi modifikasi"</string>
+    <string name="feedback_desc_fork">"Masalah versi tidak resmi ini dilaporkan di sini, bukan ke upstream"</string>
+    <string name="github_repo_label_fork">"Repositori versi modifikasi"</string>
+    <string name="developer_contact_fork">"Email penulis versi modifikasi"</string>
 </resources>

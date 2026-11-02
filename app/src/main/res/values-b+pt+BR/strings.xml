@@ -1536,4 +1536,9 @@ Abra as Configurações de Modelo para verificar a chave de API, a URL base, o n
     <string name="poke_actions_template">Modelo</string>
     <string name="poke_actions_need_one">Mantenha ao menos uma ação</string>
     <string name="poke_actions_save">Salvar</string>
+    <string name="about_uv_badge">"Não oficial"</string>
+    <string name="feedback_label_fork">"Feedback da versão modificada"</string>
+    <string name="feedback_desc_fork">"Problemas desta versão não oficial vão aqui, não para o upstream"</string>
+    <string name="github_repo_label_fork">"Repositório da versão modificada"</string>
+    <string name="developer_contact_fork">"E-mail do autor da versão modificada"</string>
 </resources>
