@@ -284,6 +284,10 @@ private fun GroupChatNormalView(
                     onPokeAction = { actionId, memberName ->
                         emitIntent(GroupChatUiIntent.PokeMember(memberName, actionId))
                     },
+                    documents = state.conversationState.attachedDocuments,
+                    onRemoveDocument = {
+                        emitIntent(GroupChatUiIntent.RemoveAttachedDocument(it))
+                    },
                     members = state.members,
                     selectedSpeakerId = state.conversationState.selectedSpeakerId,
                     canContinue = canContinue,
@@ -2081,6 +2085,8 @@ private fun Composer(
     onOpenFilePicker: () -> Unit,
     onOpenGalleryPicker: () -> Unit,
     onPokeAction: (String, String) -> Unit,
+    documents: List<me.kafuuneko.rpclient.libs.media.AttachedDocument>,
+    onRemoveDocument: (Int) -> Unit,
     members: List<GroupChatMemberItem>,
     selectedSpeakerId: Long?,
     canContinue: Boolean,
@@ -2113,6 +2119,13 @@ private fun Composer(
                 state = imageState,
                 enabled = !generating && !imageState.submitting,
                 emit = onImageAction
+            )
+
+            // 文档附件：只列文件名与字数，正文在发送时才拼进消息
+            me.kafuuneko.rpclient.ui.widgets.DocumentAttachmentRow(
+                documents = documents,
+                enabled = !generating,
+                onRemove = onRemoveDocument
             )
 
             // 快捷操作胶囊条

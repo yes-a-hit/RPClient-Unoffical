@@ -409,6 +409,7 @@ private fun ChatNormal(
             isGenerating = state.conversationState.generationState.isGenerating(),
             hasAssistantMessage = state.conversationState.hasAssistantMessage,
             imageState = state.imageState,
+            documents = state.conversationState.attachedDocuments,
             emit = emit
         )
     }
@@ -1343,6 +1344,7 @@ private fun ChatInputBar(
     isGenerating: Boolean,
     hasAssistantMessage: Boolean,
     imageState: MessageImageState,
+    documents: List<me.kafuuneko.rpclient.libs.media.AttachedDocument>,
     emit: ChatUiIntent.() -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
@@ -1375,6 +1377,13 @@ private fun ChatInputBar(
                 state = imageState,
                 enabled = !isGenerating && !imageState.submitting,
                 emit = { ChatUiIntent.ImageAction(it).emit() }
+            )
+
+            // 文档附件：只列文件名与字数，正文在发送时才拼进消息
+            me.kafuuneko.rpclient.ui.widgets.DocumentAttachmentRow(
+                documents = documents,
+                enabled = !isGenerating,
+                onRemove = { ChatUiIntent.RemoveAttachedDocument(it).emit() }
             )
 
             // - 快捷操作胶囊条（随页面整体上移平推，常驻方便快速操作）

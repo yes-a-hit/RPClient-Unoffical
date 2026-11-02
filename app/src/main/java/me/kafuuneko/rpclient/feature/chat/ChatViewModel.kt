@@ -262,7 +262,13 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         // 选完文件先分流：图片交给图片管线（后续要过压缩、GIF 抽帧、进消息附件表），
         // 不能塞进草稿当文本——那样模型只看到一串乱码。其余按文档读文字。
         val images = intent.uris.filter { isImageUri(it) }
-        if (images.isNotEmpty()) mImageCoordinator.handle(MessageImageAction.Picked(images))
+        if (images.isNotEmpty()) {
+            // 图片管线要求先登记「这一批结果是为哪个草稿选的」，否则 Picked 回来时
+            // pendingPick 为空，会被判成「没有对应的选择请求」直接报图片无法处理。
+            // 系统相册入口在开 Activity 之前就调了这个，附加文件这条路没有，所以在这里补。
+            mImageCoordinator.choose(editing = false)
+            mImageCoordinator.handle(MessageImageAction.Picked(images))
+        }
         val documents = intent.uris.filterNot { isImageUri(it) }
         if (documents.isEmpty()) return
         val read: List<AttachedDocument> = withContext(Dispatchers.IO) {

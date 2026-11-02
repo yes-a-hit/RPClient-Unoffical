@@ -257,32 +257,52 @@ class GroupChatViewModel :
     }
 
     @UiIntentObserver(GroupChatUiIntent.FilesPicked::class)
-    private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {
-        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+    private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
         // 文件选择器不限类型，用户可能顺手选了图；先分出来走图片，别当文本读
         val images = intent.uris.filter { isImageUri(it) }
-        if (images.isNotEmpty()) mImageCoordinator.handle(MessageImageAction.Picked(images))
+        if (images.isNotEmpty()) {
+            // 与单聊同因：附加文件这条路没有走过「登记选择目标」，不补这一步
+            // 图片回来时会被判成无主结果，一律报图片无法处理。
+            mImageCoordinator.choose(editing = false)
+            mImageCoordinator.handle(MessageImageAction.Picked(images))
+        }
         val documents = intent.uris.filterNot { isImageUri(it) }
         if (documents.isEmpty()) return
-        val chunks = withContext(Dispatchers.IO) {
+        // 文档不塞输入框：几万字正文贴进去既看不清也改不动，
+        // 只存文件名与正文，UI 显示成一条可删的附件，发送时再拼进消息。
+        val read: List<me.kafuuneko.rpclient.libs.media.AttachedDocument> = withContext(Dispatchers.IO) {
             documents.mapNotNull { uri ->
-                if (DocumentText.isDocx(displayNameOf(uri))) {
+                val name = displayNameOf(uri) ?: "未命名文件"
+                val text = if (DocumentText.isDocx(name)) {
                     DocumentText.readDocx(mContext.contentResolver, uri)
                 } else {
                     readTextFileContent(uri)
                 }
+                text?.takeIf { it.isNotBlank() }
+                    ?.let { me.kafuuneko.rpclient.libs.media.AttachedDocument(name, it) }
             }
         }
-        if (chunks.isEmpty()) {
+        if (read.isEmpty()) {
             AppViewEvent.PopupToastMessage(
                 mContext.getString(R.string.attach_file_unsupported)
             ).tryEmit()
             return
         }
-        val merged = (uiState.conversationState.inputDraft.trim() + "\n\n" +
-            chunks.joinToString("\n\n")).trim()
         uiState.copy(
-            conversationState = uiState.conversationState.copy(inputDraft = merged)
+            conversationState = uiState.conversationState.copy(
+                attachedDocuments = uiState.conversationState.attachedDocuments + read
+            )
+        ).setup()
+    }
+
+    /** 撤掉一份文档附件。 */
+    @UiIntentObserver(GroupChatUiIntent.RemoveAttachedDocument::class)
+    private suspend fun onRemoveAttachedDocument(intent: GroupChatUiIntent.RemoveAttachedDocument) {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        val remaining = uiState.conversationState.attachedDocuments
+            .filterIndexed { index, _ -> index != intent.index }
+        uiState.copy(
+            conversationState = uiState.conversationState.copy(attachedDocuments = remaining)
         ).setup()
     }
 
@@ -1100,8 +1120,13 @@ class GroupChatViewModel :
                 summary = null
             )
             // 执行用户输入端 Source 正则
-            val input = applyUserRegex(initialData, rawInput)
-            val isUserInput = rawInput.isNotBlank() || images.isNotEmpty()
+            val attachments = uiState.conversationState.attachedDocuments
+            // 文档正文只拼在落库的消息上，不参与场景指令解析与发言者选择——
+            // 那两步看的是「用户说了什么」，不是「文件里写了什么」。
+            val input = applyUserRegex(initialData, rawInput) +
+                if (attachments.isEmpty()) "" else
+                    "\n\n" + attachments.joinToString("\n\n") { it.renderForMessage() }
+            val isUserInput = rawInput.isNotBlank() || images.isNotEmpty() || attachments.isNotEmpty()
             // 确定激活文本（若有用户输入使用用户输入，否则使用上一条消息）
             val activationText = if (isUserInput) {
                 input

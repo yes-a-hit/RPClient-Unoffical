@@ -16,6 +16,8 @@ sealed class GroupChatUiIntent {
     data object OpenFilePicker : GroupChatUiIntent()
     /** 文件选择器返回的已选文件。 */
     data class FilesPicked(val uris: List<Uri>) : GroupChatUiIntent()
+    /** 移除第 index 个文档附件（发送前的撤销）。 */
+    data class RemoveAttachedDocument(val index: Int) : GroupChatUiIntent()
     /** 打开图库挑选对话框（从已导入的图片里挑，不是从手机相册导入）。 */
     data object OpenGalleryPicker : GroupChatUiIntent()
     /** 关闭图库挑选对话框。 */

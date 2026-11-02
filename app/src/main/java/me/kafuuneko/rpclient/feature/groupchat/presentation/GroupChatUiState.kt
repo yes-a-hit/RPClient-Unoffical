@@ -89,6 +89,8 @@ data class GroupChatConversationState(
     val selectedSpeakerId: Long?,
     /** 消息输入框中尚未发送的草稿。 */
     val inputDraft: String = "",
+    /** 本轮随消息发出的文档；发送后清空，正文在发送时拼进消息。 */
+    val attachedDocuments: List<me.kafuuneko.rpclient.libs.media.AttachedDocument> = emptyList(),
     /** 当前模型生成任务的生命周期状态。 */
     val generationState: GroupChatGenerationState = GroupChatGenerationState.Idle,
     /** 当前已展开显示的推理块 ID 集合。 */
