@@ -85,6 +85,7 @@ import me.kafuuneko.rpclient.libs.prompt.model.PromptGenerationMode
 import me.kafuuneko.rpclient.libs.prompt.model.PromptInspection
 import me.kafuuneko.rpclient.libs.prompt.model.PromptOmissionReason
 import me.kafuuneko.rpclient.libs.prompt.nextSummaryCandidateWindowSize
+import me.kafuuneko.rpclient.libs.poke.PokeAction
 import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.libs.prompt.summaryCandidateMessageLimit
 import me.kafuuneko.rpclient.libs.prompt.summarySafeContent
@@ -608,6 +609,74 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             conversationState = uiState.conversationState.copy(inputDraft = text)
         ).setup()
         onSendMessage()
+    }
+
+    /** 动作列表的编辑：与群聊共用同一份全局列表，改一处两边都生效。 */
+    @UiIntentObserver(ChatUiIntent.OpenPokeActionEditor::class)
+    private suspend fun onOpenPokeActionEditor() {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        uiState.copy(
+            pokeActionEditorVisible = true,
+            pokeActionDrafts = PokeActions.parse(AppModel.pokeActions)
+        ).setup()
+    }
+
+    @UiIntentObserver(ChatUiIntent.ClosePokeActionEditor::class)
+    private suspend fun onClosePokeActionEditor() {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        uiState.copy(
+            pokeActionEditorVisible = false,
+            pokeActionDrafts = emptyList()
+        ).setup()
+    }
+
+    @UiIntentObserver(ChatUiIntent.ChangePokeAction::class)
+    private suspend fun onChangePokeAction(intent: ChatUiIntent.ChangePokeAction) {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        uiState.copy(
+            pokeActionDrafts = uiState.pokeActionDrafts.map { action ->
+                if (action.id == intent.id) {
+                    action.copy(label = intent.label, template = intent.template)
+                } else {
+                    action
+                }
+            }
+        ).setup()
+    }
+
+    @UiIntentObserver(ChatUiIntent.AddPokeAction::class)
+    private suspend fun onAddPokeAction() {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        val drafts = uiState.pokeActionDrafts
+        // id 只用于内部对应，用户看不到；用递增序号保证不和现有条目撞
+        val nextId = "custom_" + (drafts.size + 1)
+        uiState.copy(
+            pokeActionDrafts = drafts + PokeAction(id = nextId, label = "", template = "（{name}）")
+        ).setup()
+    }
+
+    @UiIntentObserver(ChatUiIntent.RemovePokeAction::class)
+    private suspend fun onRemovePokeAction(intent: ChatUiIntent.RemovePokeAction) {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        uiState.copy(
+            pokeActionDrafts = uiState.pokeActionDrafts.filterNot { it.id == intent.id }
+        ).setup()
+    }
+
+    @UiIntentObserver(ChatUiIntent.SavePokeActions::class)
+    private suspend fun onSavePokeActions() {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        val drafts = uiState.pokeActionDrafts
+            .filter { it.label.isNotBlank() || it.template.isNotBlank() }
+        if (drafts.isEmpty()) {
+            AppViewEvent.PopupToastMessageByResId(R.string.poke_actions_need_one).tryEmit()
+            return
+        }
+        AppModel.pokeActions = PokeActions.serialize(drafts)
+        uiState.copy(
+            pokeActionEditorVisible = false,
+            pokeActionDrafts = emptyList()
+        ).setup()
     }
 
     /**

@@ -40,6 +40,10 @@ sealed class ChatUiState {
         val dialogState: ChatDialogState = ChatDialogState.None,
         /** 图库挑选对话框是否打开。 */
         val galleryPickerVisible: Boolean = false,
+        /** 动作编辑对话框是否打开；编辑的是全局默认动作列表。 */
+        val pokeActionEditorVisible: Boolean = false,
+        /** 编辑中的动作草稿，取消时整份丢弃。 */
+        val pokeActionDrafts: List<me.kafuuneko.rpclient.libs.poke.PokeAction> = emptyList(),
         /** 聊天页背景配置，由全局偏好解析出的已解码位图。 */
         val backgroundState: ChatBackgroundUiState = ChatBackgroundUiState()
     ) : ChatUiState()

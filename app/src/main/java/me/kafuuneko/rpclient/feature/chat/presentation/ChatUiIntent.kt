@@ -146,6 +146,18 @@ sealed class ChatUiIntent {
     /** 对角色做一次预设动作；actionId 取自可编辑的动作列表。 */
     data class PokeAction(val actionId: String) : ChatUiIntent()
 
+    data object OpenPokeActionEditor : ChatUiIntent()
+
+    data object ClosePokeActionEditor : ChatUiIntent()
+
+    data class ChangePokeAction(val id: String, val label: String, val template: String) : ChatUiIntent()
+
+    data object AddPokeAction : ChatUiIntent()
+
+    data class RemovePokeAction(val id: String) : ChatUiIntent()
+
+    data object SavePokeActions : ChatUiIntent()
+
     data class SaveUserName(val value: String) : ChatUiIntent()
 
     data class SaveUserDescription(val value: String) : ChatUiIntent()

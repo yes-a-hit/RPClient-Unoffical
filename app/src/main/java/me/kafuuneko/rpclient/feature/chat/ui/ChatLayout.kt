@@ -132,6 +132,7 @@ import me.kafuuneko.rpclient.feature.chat.presentation.ChatUiState
 import me.kafuuneko.rpclient.libs.AppModel
 import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.media.MessageImageState
+import me.kafuuneko.rpclient.libs.poke.PokeAction
 import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.model.MessageContentPart
 import me.kafuuneko.rpclient.ui.dialog.AppConfirmDialog
@@ -150,6 +151,7 @@ import me.kafuuneko.rpclient.ui.theme.DefaultCharacterAccentColor
 import me.kafuuneko.rpclient.ui.theme.NarratorAvatarColor
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
 import me.kafuuneko.rpclient.ui.widgets.GalleryPickerDialog
+import me.kafuuneko.rpclient.ui.widgets.PokeActionEditorDialog
 import me.kafuuneko.rpclient.ui.widgets.MessageDocumentBlock
 import me.kafuuneko.rpclient.ui.widgets.MessageDocumentCard
 import me.kafuuneko.rpclient.ui.widgets.MarkdownMessageText
@@ -193,6 +195,7 @@ fun ChatLayout(
                     session = uiState.session,
                     lorebookState = uiState.lorebookState,
                     loadState = uiState.loadState,
+                    pokeActionDrafts = uiState.pokeActionDrafts,
                     emit = emit
                 )
             }
@@ -203,6 +206,18 @@ fun ChatLayout(
                     onConfirm = { picked ->
                         ChatUiIntent.AttachGalleryImages(picked.map { it.fileUuid }).emit()
                     }
+                )
+            }
+            if (uiState.pokeActionEditorVisible) {
+                PokeActionEditorDialog(
+                    drafts = uiState.pokeActionDrafts,
+                    onDismiss = { ChatUiIntent.ClosePokeActionEditor.emit() },
+                    onChange = { id, label, template ->
+                        ChatUiIntent.ChangePokeAction(id, label, template).emit()
+                    },
+                    onAdd = { ChatUiIntent.AddPokeAction.emit() },
+                    onRemove = { ChatUiIntent.RemovePokeAction(it).emit() },
+                    onSave = { ChatUiIntent.SavePokeActions.emit() }
                 )
             }
         }
@@ -1575,6 +1590,7 @@ private fun ChatSettingsPage(
     session: ChatSessionItem,
     lorebookState: ChatLorebookState,
     loadState: ChatLoadState,
+    pokeActionDrafts: List<PokeAction>,
     emit: ChatUiIntent.() -> Unit
 ) {
     Column(
@@ -1642,6 +1658,31 @@ private fun ChatSettingsPage(
                         iconTint = MaterialTheme.colorScheme.error,
                         enabled = loadState == ChatLoadState.None
                     ) { ChatUiIntent.DeleteSessionClick.emit() }
+                }
+            }
+            item {
+                // 动作预设：群聊侧只按默认动作触发，编辑入口留在这里，
+                // 因为单人对话才有「对某个角色做什么」的指向性。
+                SettingsSection(title = stringResource(R.string.poke_actions_title)) {
+                    Text(
+                        text = stringResource(R.string.poke_actions_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val actions = remember(pokeActionDrafts) {
+                        PokeActions.parse(AppModel.pokeActions)
+                    }
+                    actions.forEach { action ->
+                        MenuAction(
+                            icon = Icons.Rounded.TouchApp,
+                            title = action.label,
+                            subtitle = action.template
+                        ) { ChatUiIntent.OpenPokeActionEditor.emit() }
+                    }
+                    MenuAction(
+                        icon = Icons.Rounded.Edit,
+                        title = stringResource(R.string.poke_actions_edit)
+                    ) { ChatUiIntent.OpenPokeActionEditor.emit() }
                 }
             }
             item {

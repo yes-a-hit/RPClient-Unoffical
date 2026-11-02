@@ -159,6 +159,7 @@ import me.kafuuneko.rpclient.ui.widgets.MarkdownMessageText
 import me.kafuuneko.rpclient.ui.widgets.MessageDocumentBlock
 import me.kafuuneko.rpclient.ui.widgets.MessageDocumentCard
 import me.kafuuneko.rpclient.ui.widgets.NoProviderBanner
+import me.kafuuneko.rpclient.ui.widgets.PokeActionEditorDialog
 import me.kafuuneko.rpclient.ui.widgets.RpAvatar
 import me.kafuuneko.rpclient.ui.widgets.chatBackgroundLayer
 import me.kafuuneko.rpclient.ui.widgets.RpLazyColumn
@@ -196,7 +197,13 @@ fun GroupChatLayout(
             if (uiState.settingsState.pokeActionEditorVisible) {
                 PokeActionEditorDialog(
                     drafts = uiState.settingsState.pokeActionDrafts,
-                    emitIntent = emitIntent
+                    onDismiss = { emitIntent(GroupChatUiIntent.ClosePokeActionEditor) },
+                    onChange = { id, label, template ->
+                        emitIntent(GroupChatUiIntent.ChangePokeAction(id, label, template))
+                    },
+                    onAdd = { emitIntent(GroupChatUiIntent.AddPokeAction) },
+                    onRemove = { emitIntent(GroupChatUiIntent.RemovePokeAction(it)) },
+                    onSave = { emitIntent(GroupChatUiIntent.SavePokeActions) }
                 )
             }
             LoadStateOverlay(uiState.loadState)
@@ -2440,91 +2447,6 @@ private fun SceneEditorDialog(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-            }
-        }
-    }
-}
-
-/**
- * 动作预设的编辑框。
- *
- * 名字直接存显示文本，模板里用 `{name}` 占位——用户自己写的动作，
- * 不该被语言包限制死。删到一条不剩时保存会被拦下，因为「+」菜单
- * 里至少要有东西可点。
- */
-@Composable
-private fun PokeActionEditorDialog(
-    drafts: List<PokeAction>,
-    emitIntent: (GroupChatUiIntent) -> Unit
-) {
-    AppDialogScaffold(
-        onDismissRequest = { emitIntent(GroupChatUiIntent.ClosePokeActionEditor) },
-        title = stringResource(R.string.poke_actions_title),
-        confirmText = stringResource(R.string.poke_actions_save),
-        confirmEnabled = drafts.any { it.label.isNotBlank() || it.template.isNotBlank() },
-        onConfirm = { emitIntent(GroupChatUiIntent.SavePokeActions) },
-        scrollableContent = true
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = stringResource(R.string.poke_actions_subtitle),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            drafts.forEach { action ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = action.label,
-                            onValueChange = {
-                                emitIntent(
-                                    GroupChatUiIntent.ChangePokeAction(
-                                        action.id, it, action.template
-                                    )
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text(stringResource(R.string.poke_actions_label)) },
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = action.template,
-                            onValueChange = {
-                                emitIntent(
-                                    GroupChatUiIntent.ChangePokeAction(
-                                        action.id, action.label, it
-                                    )
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text(stringResource(R.string.poke_actions_template)) },
-                            minLines = 1,
-                            maxLines = 3
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            emitIntent(GroupChatUiIntent.RemovePokeAction(action.id))
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Delete,
-                            contentDescription = stringResource(R.string.delete),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-            TextButton(onClick = { emitIntent(GroupChatUiIntent.AddPokeAction) }) {
-                Icon(Icons.Rounded.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(stringResource(R.string.poke_actions_add))
             }
         }
     }
