@@ -156,6 +156,8 @@ import me.kafuuneko.rpclient.ui.dialog.AppDialogScaffold
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
 import me.kafuuneko.rpclient.ui.widgets.GalleryPickerDialog
 import me.kafuuneko.rpclient.ui.widgets.MarkdownMessageText
+import me.kafuuneko.rpclient.ui.widgets.MessageDocumentBlock
+import me.kafuuneko.rpclient.ui.widgets.MessageDocumentCard
 import me.kafuuneko.rpclient.ui.widgets.NoProviderBanner
 import me.kafuuneko.rpclient.ui.widgets.RpAvatar
 import me.kafuuneko.rpclient.ui.widgets.chatBackgroundLayer
@@ -1749,10 +1751,21 @@ private fun GroupMessageContent(
             when (part) {
                 is MessageContentPart.Text -> {
                     if (part.content.isNotBlank()) {
-                        MarkdownMessageText(
-                            content = part.content,
-                            isUser = isUser
-                        )
+                        // 附带文件正文收成可展开卡片，和单聊一致
+                        MessageDocumentBlock.split(part.content).forEach { segment ->
+                            when (segment) {
+                                is MessageDocumentBlock.Segment.Text -> MarkdownMessageText(
+                                    content = segment.content,
+                                    isUser = isUser
+                                )
+
+                                is MessageDocumentBlock.Segment.Document -> MessageDocumentCard(
+                                    name = segment.name,
+                                    body = segment.body,
+                                    isUser = isUser
+                                )
+                            }
+                        }
                     }
                 }
 

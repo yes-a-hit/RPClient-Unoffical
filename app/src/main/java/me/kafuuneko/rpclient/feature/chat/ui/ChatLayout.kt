@@ -150,6 +150,8 @@ import me.kafuuneko.rpclient.ui.theme.DefaultCharacterAccentColor
 import me.kafuuneko.rpclient.ui.theme.NarratorAvatarColor
 import me.kafuuneko.rpclient.ui.widgets.AppTopBar
 import me.kafuuneko.rpclient.ui.widgets.GalleryPickerDialog
+import me.kafuuneko.rpclient.ui.widgets.MessageDocumentBlock
+import me.kafuuneko.rpclient.ui.widgets.MessageDocumentCard
 import me.kafuuneko.rpclient.ui.widgets.MarkdownMessageText
 import me.kafuuneko.rpclient.ui.widgets.NoProviderBanner
 import me.kafuuneko.rpclient.ui.widgets.RpAvatar
@@ -985,10 +987,22 @@ private fun MessageContent(
             when (part) {
                 is MessageContentPart.Text -> {
                     if (part.content.isNotBlank()) {
-                        MarkdownMessageText(
-                            content = part.content,
-                            isUser = isUser
-                        )
+                        // 附带文件的正文留在消息里（模型读得到、历史存得下），
+                        // 但界面上收成一张可展开的卡片，不铺满气泡
+                        MessageDocumentBlock.split(part.content).forEach { segment ->
+                            when (segment) {
+                                is MessageDocumentBlock.Segment.Text -> MarkdownMessageText(
+                                    content = segment.content,
+                                    isUser = isUser
+                                )
+
+                                is MessageDocumentBlock.Segment.Document -> MessageDocumentCard(
+                                    name = segment.name,
+                                    body = segment.body,
+                                    isUser = isUser
+                                )
+                            }
+                        }
                     }
                 }
 
