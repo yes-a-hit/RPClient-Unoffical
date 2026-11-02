@@ -267,7 +267,12 @@ data class MainImageSendState(
     val maxWidth: String = "1536",
     val maxHeight: String = "1536",
     val hasChanges: Boolean = false,
-    @param:StringRes val errorResId: Int? = null
+    @param:StringRes val errorResId: Int? = null,
+    /** 动图抽帧数量草稿，与图片尺寸参数分开保存。 */
+    val gifFrames: String = "3",
+    /** 帧延迟兜底值草稿，单位毫秒。 */
+    val gifMinDelayMs: String = "100",
+    val gifHasChanges: Boolean = false
 ) {
     companion object {
         /**
@@ -277,6 +282,17 @@ data class MainImageSendState(
          */
         fun from(settings: ImageSendSettings): MainImageSendState = MainImageSendState(
             settings.mode, settings.maxFileKiB.toString(), settings.maxWidth.toString(), settings.maxHeight.toString()
+        )
+
+        /**
+         * 从已保存的动图参数创建草稿。
+         *
+         * 与图片尺寸分开构造：两者独立保存，一方有未提交修改时不该覆盖另一方的草稿。
+         */
+        fun withGif(state: MainImageSendState, gif: me.kafuuneko.rpclient.libs.media.GifCaptureSettings) = state.copy(
+            gifFrames = gif.frames.toString(),
+            gifMinDelayMs = gif.minDelayMs.toString(),
+            gifHasChanges = false
         )
     }
 }

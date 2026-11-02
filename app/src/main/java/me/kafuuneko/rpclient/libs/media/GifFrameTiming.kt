@@ -22,9 +22,12 @@ internal object GifFrameTiming {
      * 返回每一帧的起始时间（毫秒）。解析不了就返回空列表。
      *
      * 延迟为 0 的帧（GIF 规范里表示「尽快显示」，渲染器通常按 100ms 处理）会被抬到
-     * [MIN_FRAME_DELAY_MS]，否则整张图累积时长仍然是 0，等于没修。
+     * [minDelayMs]，否则整张图累积时长仍然是 0，等于没修。
      */
-    fun frameStartTimes(bytes: ByteArray): List<Int> {
+    fun frameStartTimes(
+        bytes: ByteArray,
+        minDelayMs: Int = GifCaptureSettings.DEFAULT_MIN_DELAY_MS
+    ): List<Int> {
         // 尾部补 12 个 0：解析器会在若干位置按固定宽度读取，补零后越界也不会抛异常，
         // 少写一堆边界判断。合法 GIF 本来就有结束块，多出的 0 不会被读到。
         val data = bytes + ByteArray(12)
@@ -68,7 +71,7 @@ internal object GifFrameTiming {
                     if (pos + 9 >= data.size) return starts
                     val localPacked = data[pos + 9].toInt() and 0xFF
                     starts += elapsed
-                    val delay = if (pendingDelay > 0) pendingDelay else MIN_FRAME_DELAY_MS
+                    val delay = if (pendingDelay > 0) pendingDelay else minDelayMs
                     elapsed += delay
                     pendingDelay = -1
                     pos += 10
@@ -98,7 +101,4 @@ internal object GifFrameTiming {
 
     private fun u16(data: ByteArray, index: Int): Int =
         (data[index].toInt() and 0xFF) or ((data[index + 1].toInt() and 0xFF) shl 8)
-
-    /** 延迟为 0 时的兜底值，与主流渲染器一致。 */
-    private const val MIN_FRAME_DELAY_MS = 100
 }

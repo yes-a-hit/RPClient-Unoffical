@@ -85,6 +85,7 @@ import me.kafuuneko.rpclient.libs.prompt.model.PromptGenerationMode
 import me.kafuuneko.rpclient.libs.prompt.model.PromptInspection
 import me.kafuuneko.rpclient.libs.prompt.model.PromptOmissionReason
 import me.kafuuneko.rpclient.libs.prompt.nextSummaryCandidateWindowSize
+import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.libs.prompt.summaryCandidateMessageLimit
 import me.kafuuneko.rpclient.libs.prompt.summarySafeContent
 import me.kafuuneko.rpclient.libs.regex.RegexMessageProcessor
@@ -601,6 +602,34 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         if (mImageCoordinator.state.processing) return
         val template = AppModel.pokePrompt.ifBlank { "（戳了戳 {name}）" }
         val poke = template.replace("{name}", uiState.character.name)
+        val reaction = AppModel.pokeReaction.trim()
+        val text = if (reaction.isBlank()) poke else "$poke\n$reaction"
+        uiState.copy(
+            conversationState = uiState.conversationState.copy(inputDraft = text)
+        ).setup()
+        onSendMessage()
+    }
+
+    /**
+     * 对角色做一次预设动作（戳一戳 / 摸头 / 捏脸 …）。
+     *
+     * 和 [onPokeCharacter] 走同一条发送链路，区别只在于动作用哪条模板：
+     * 这里按 id 从可编辑列表里取，找不到就落到第一条。单聊只有一个角色，
+     * 不存在群聊那种「对谁做」的歧义。
+     */
+    @UiIntentObserver(ChatUiIntent.PokeAction::class)
+    private suspend fun onPokeAction(intent: ChatUiIntent.PokeAction) {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        if (mGenerationJob?.isCompleted == false) {
+            AppViewEvent.PopupToastMessageByResId(R.string.generation_already_running).tryEmit()
+            return
+        }
+        if (mImageCoordinator.state.processing) return
+        val action = PokeActions.parse(AppModel.pokeActions)
+            .firstOrNull { it.id == intent.actionId }
+            ?: PokeActions.parse(AppModel.pokeActions).firstOrNull()
+            ?: return
+        val poke = PokeActions.render(action, uiState.character.name)
         val reaction = AppModel.pokeReaction.trim()
         val text = if (reaction.isBlank()) poke else "$poke\n$reaction"
         uiState.copy(

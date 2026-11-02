@@ -279,6 +279,14 @@ Treat it as an instruction, not as manuscript text. Do not quote, repeat, explai
     // 全部图片发送参数以一个值保存，避免并发请求读到混合配置。
     var imageSendSettings by stringPref(default = "auto:2048:1536:1536")
 
+    // 动图抽帧数量。三帧是「看得出在动」与「别吃光视觉预算」的折中，
+    // 但不同模型的视觉预算差很多，所以放开给用户调。
+    var gifSampleFrames by intPref(default = 3)
+
+    // 帧延迟为 0 时按多少毫秒算。很多工具导出的 GIF 把延迟写成 0，
+    // 照 0 算会让所有帧落在同一时刻，抽出来全一样。
+    var gifFrameDelayMs by intPref(default = 100)
+
     // 聊天背景图片，存储文件 UUID；为空时聊天页使用主题纯色背景。
     var chatBackgroundImage by stringPref(default = "")
 

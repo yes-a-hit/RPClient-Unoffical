@@ -1532,4 +1532,8 @@
     <string name="feedback_desc_fork">"本非官方版本的问题请报到这里，不要报给上游"</string>
     <string name="github_repo_label_fork">"定制分支仓库"</string>
     <string name="developer_contact_fork">"定制分支作者邮箱"</string>
+    <string name="gif_capture_title">"动图"</string>
+    <string name="gif_capture_description">"动图会被抽成几帧拼成一张连环画，模型才能看出先后顺序。帧数越多越吃视觉 token。"</string>
+    <string name="gif_capture_frames">"抽帧数量（1-6）"</string>
+    <string name="gif_capture_min_delay">"帧延迟下限，毫秒（20-1000）"</string>
 </resources>

@@ -1538,4 +1538,8 @@
     <string name="feedback_desc_fork">"Les problèmes de cette version non officielle se signalent ici, pas en amont"</string>
     <string name="github_repo_label_fork">"Dépôt de la version modifiée"</string>
     <string name="developer_contact_fork">"E-mail de l'auteur de la version modifiée"</string>
+    <string name="gif_capture_title">"Images animées"</string>
+    <string name="gif_capture_description">"Les GIF animés sont découpés en images puis réunis en une bande, pour que le modèle voie l'ordre des événements. Plus d'images coûtent plus de tokens de vision."</string>
+    <string name="gif_capture_frames">"Nombre d'images (1-6)"</string>
+    <string name="gif_capture_min_delay">"Délai minimal d'une image en ms (20-1000)"</string>
 </resources>

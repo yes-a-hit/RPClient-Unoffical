@@ -1516,4 +1516,8 @@ Apri le impostazioni del modello per verificare la chiave API, l\'URL di base, i
     <string name="feedback_desc_fork">"I problemi di questa versione non ufficiale vanno qui, non a monte"</string>
     <string name="github_repo_label_fork">"Repository della versione modificata"</string>
     <string name="developer_contact_fork">"Email dell'autore della versione modificata"</string>
+    <string name="gif_capture_title">"Immagini animate"</string>
+    <string name="gif_capture_description">"Le GIF animate vengono divise in fotogrammi e unite in una striscia, così il modello vede l'ordine. Più fotogrammi consumano più token di visione."</string>
+    <string name="gif_capture_frames">"Fotogrammi da campionare (1-6)"</string>
+    <string name="gif_capture_min_delay">"Ritardo minimo del fotogramma in ms (20-1000)"</string>
 </resources>

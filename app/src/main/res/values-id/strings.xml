@@ -1538,4 +1538,8 @@ Buka Pengaturan Model untuk memeriksa kunci API, URL dasar, nama model, dan izin
     <string name="feedback_desc_fork">"Masalah versi tidak resmi ini dilaporkan di sini, bukan ke upstream"</string>
     <string name="github_repo_label_fork">"Repositori versi modifikasi"</string>
     <string name="developer_contact_fork">"Email penulis versi modifikasi"</string>
+    <string name="gif_capture_title">"Gambar bergerak"</string>
+    <string name="gif_capture_description">"GIF bergerak dipecah menjadi beberapa bingkai lalu digabung jadi satu strip agar model melihat urutannya. Semakin banyak bingkai, semakin boros token visual."</string>
+    <string name="gif_capture_frames">"Jumlah bingkai (1-6)"</string>
+    <string name="gif_capture_min_delay">"Jeda bingkai minimum dalam ms (20-1000)"</string>
 </resources>

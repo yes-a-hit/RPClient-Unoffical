@@ -1590,4 +1590,8 @@
     <string name="feedback_desc_fork">"Issues for this unofficial build go here, not to upstream"</string>
     <string name="github_repo_label_fork">"Fork repository"</string>
     <string name="developer_contact_fork">"Fork author email"</string>
+    <string name="gif_capture_title">"Animated images"</string>
+    <string name="gif_capture_description">"Animated GIFs are split into frames and joined into one strip, so the model can see the order of events. More frames cost more vision tokens."</string>
+    <string name="gif_capture_frames">"Frames to sample (1-6)"</string>
+    <string name="gif_capture_min_delay">"Minimum frame delay in ms (20-1000)"</string>
 </resources>

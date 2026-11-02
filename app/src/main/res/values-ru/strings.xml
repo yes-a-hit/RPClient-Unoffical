@@ -1542,4 +1542,8 @@
     <string name="feedback_desc_fork">"Проблемы этой неофициальной сборки сообщайте сюда, а не в оригинал"</string>
     <string name="github_repo_label_fork">"Репозиторий сборки"</string>
     <string name="developer_contact_fork">"Почта автора сборки"</string>
+    <string name="gif_capture_title">"Анимированные изображения"</string>
+    <string name="gif_capture_description">"Анимированные GIF разбиваются на кадры и склеиваются в полосу, чтобы модель видела порядок событий. Чем больше кадров, тем больше визуальных токенов."</string>
+    <string name="gif_capture_frames">"Число кадров (1-6)"</string>
+    <string name="gif_capture_min_delay">"Минимальная задержка кадра, мс (20-1000)"</string>
 </resources>

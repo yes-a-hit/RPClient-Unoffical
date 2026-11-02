@@ -59,6 +59,29 @@ internal fun ImageSendPanel(state: MainImageSendState, emit: MainUiIntent.() -> 
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (state.mode == ImageSendMode.Custom) ImageSendLimits(state, emit)
+            // 动图抽帧与尺寸参数互不依赖，单独一段：改尺寸不该顺手冲掉抽帧草稿
+            Text(
+                stringResource(R.string.gif_capture_title),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                stringResource(R.string.gif_capture_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            ImageLimitField(state.gifFrames, R.string.gif_capture_frames) {
+                MainUiIntent.ChangeGifCapture("frames", it).emit()
+            }
+            ImageLimitField(state.gifMinDelayMs, R.string.gif_capture_min_delay) {
+                MainUiIntent.ChangeGifCapture("minDelayMs", it).emit()
+            }
+            Button(
+                onClick = { MainUiIntent.SaveGifCapture.emit() },
+                enabled = state.gifHasChanges
+            ) {
+                Text(stringResource(R.string.save))
+            }
         }
     }
 }

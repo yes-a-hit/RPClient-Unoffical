@@ -1539,4 +1539,8 @@
     <string name="feedback_desc_fork">"Los problemas de esta versión no oficial van aquí, no al original"</string>
     <string name="github_repo_label_fork">"Repositorio de la bifurcación"</string>
     <string name="developer_contact_fork">"Correo del autor de la bifurcación"</string>
+    <string name="gif_capture_title">"Imágenes animadas"</string>
+    <string name="gif_capture_description">"Los GIF animados se dividen en fotogramas y se unen en una tira para que el modelo vea el orden. Más fotogramas gastan más tokens de visión."</string>
+    <string name="gif_capture_frames">"Fotogramas a muestrear (1-6)"</string>
+    <string name="gif_capture_min_delay">"Retardo mínimo del fotograma en ms (20-1000)"</string>
 </resources>

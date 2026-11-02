@@ -281,15 +281,10 @@ private fun GroupChatNormalView(
                     onImageAction = { emitIntent(GroupChatUiIntent.ImageAction(it)) },
                     onOpenFilePicker = { emitIntent(GroupChatUiIntent.OpenFilePicker) },
                     onOpenGalleryPicker = { emitIntent(GroupChatUiIntent.OpenGalleryPicker) },
-                    onPokeAction = { actionId, memberName ->
-                        emitIntent(GroupChatUiIntent.PokeMember(memberName, actionId))
-                    },
                     documents = state.conversationState.attachedDocuments,
                     onRemoveDocument = {
                         emitIntent(GroupChatUiIntent.RemoveAttachedDocument(it))
                     },
-                    members = state.members,
-                    selectedSpeakerId = state.conversationState.selectedSpeakerId,
                     canContinue = canContinue,
                     onContinue = { emitIntent(GroupChatUiIntent.ContinueLast) },
                     onSummarize = { emitIntent(GroupChatUiIntent.SummarizeNow) },
@@ -335,7 +330,9 @@ private fun GroupChatNormalView(
                 onToggleMuted = {
                     emitIntent(GroupChatUiIntent.ToggleMemberMuted(it))
                 },
-                onPoke = { emitIntent(GroupChatUiIntent.PokeMember(it)) }
+                onPoke = { name, actionId ->
+                    emitIntent(GroupChatUiIntent.PokeMember(name, actionId))
+                }
             )
             MessageList(
                 imageState = state.imageState,
@@ -1237,7 +1234,7 @@ private fun MemberRail(
     enabled: Boolean,
     onSelect: (Long) -> Unit,
     onToggleMuted: (Long) -> Unit,
-    onPoke: (String) -> Unit = {}
+    onPoke: (String, String) -> Unit = { _, _ -> }
 ) {
     Row(
         modifier = Modifier
@@ -1253,7 +1250,7 @@ private fun MemberRail(
                 enabled = enabled,
                 onSelect = { onSelect(member.id) },
                 onToggleMuted = { onToggleMuted(member.id) },
-                onPoke = { onPoke(member.name) }
+                onPoke = { actionId -> onPoke(member.name, actionId) }
             )
         }
     }
@@ -1266,7 +1263,7 @@ private fun MemberChip(
     enabled: Boolean,
     onSelect: () -> Unit,
     onToggleMuted: () -> Unit,
-    onPoke: () -> Unit = {}
+    onPoke: (String) -> Unit = {}
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val accent = getMacaronColor(member.name)
@@ -1279,7 +1276,10 @@ private fun MemberChip(
                 enabled = enabled,
                 onLongClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onPoke()
+                    // 长按用的是预设列表里的第一个动作（默认「戳一戳」）；
+                    // 想在群聊里用摸头/捏脸就把它在设置里排到最前
+                    val default = PokeActions.parse(AppModel.pokeActions).firstOrNull()
+                    onPoke(default?.id.orEmpty())
                 },
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2084,19 +2084,14 @@ private fun Composer(
     onImageAction: (MessageImageAction) -> Unit,
     onOpenFilePicker: () -> Unit,
     onOpenGalleryPicker: () -> Unit,
-    onPokeAction: (String, String) -> Unit,
     documents: List<me.kafuuneko.rpclient.libs.media.AttachedDocument>,
     onRemoveDocument: (Int) -> Unit,
-    members: List<GroupChatMemberItem>,
-    selectedSpeakerId: Long?,
     canContinue: Boolean,
     onContinue: () -> Unit,
     onSummarize: () -> Unit,
     onImpersonate: () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
-    // 动作列表存在 Kotpref 里，读一次就够；每次重组都解析一遍 JSON 没意义
-    val pokeActions = remember { PokeActions.parse(AppModel.pokeActions) }
     val sendButtonColor by animateColorAsState(
         targetValue = if (generating) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         label = "sendButtonColor"
@@ -2238,25 +2233,9 @@ private fun Composer(
                                         onOpenGalleryPicker()
                                     }
                                 )
-                                // 动作：戳一戳、摸头、捏脸那些。对当前选中的发言人做；
-                                // 没选的话落到第一个在场成员，别让点了没反应。
-                                pokeActions.forEach { action ->
-                                    DropdownMenuItem(
-                                        text = { Text(action.label) },
-                                        leadingIcon = {
-                                            Icon(
-                                                imageVector = Icons.Rounded.TouchApp,
-                                                contentDescription = null
-                                            )
-                                        },
-                                        onClick = {
-                                            menuExpanded = false
-                                            val target = members.firstOrNull { it.id == selectedSpeakerId }
-                                                ?: members.firstOrNull()
-                                            if (target != null) onPokeAction(action.id, target.name)
-                                        }
-                                    )
-                                }
+                                // 动作不放进「+」：群聊里没有天然的动作对象，
+                                // 落到「最近发言的人」经常不是你心里那个人。
+                                // 改成长按成员头像触发，目标由手指决定，不会错。
                             }
                         }
                     }

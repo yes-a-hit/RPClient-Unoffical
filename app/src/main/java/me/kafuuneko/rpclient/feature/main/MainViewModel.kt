@@ -93,6 +93,7 @@ import me.kafuuneko.rpclient.libs.core.AppViewEvent
 import me.kafuuneko.rpclient.libs.core.CoreViewModelWithEvent
 import me.kafuuneko.rpclient.libs.core.UiIntentObserver
 import me.kafuuneko.rpclient.libs.defaults.normalizedUserName
+import me.kafuuneko.rpclient.libs.media.GifCaptureSettings
 import me.kafuuneko.rpclient.libs.media.ImageSendMode
 import me.kafuuneko.rpclient.libs.media.ImageSendSettings
 import me.kafuuneko.rpclient.libs.prompt.model.ExampleDialogueBehavior
@@ -1742,6 +1743,41 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
         uiState.copy(settingsState = uiState.settingsState.copy(imageSendState = updated)).setup()
     }
 
+    /** 改抽帧参数草稿；与图片尺寸分开，一方有未提交修改不覆盖另一方。 */
+    @UiIntentObserver(MainUiIntent.ChangeGifCapture::class)
+    private fun onChangeGifCapture(intent: MainUiIntent.ChangeGifCapture) {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        val state = uiState.settingsState.imageSendState
+        val edited = when (intent.field) {
+            "frames" -> state.copy(gifFrames = intent.value)
+            "minDelayMs" -> state.copy(gifMinDelayMs = intent.value)
+            else -> return
+        }
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                imageSendState = edited.copy(gifHasChanges = true)
+            )
+        ).setup()
+    }
+
+    /** 保存抽帧参数；越界值由 [GifCaptureSettings.decode] 钳到区间内，不报错只归位。 */
+    @UiIntentObserver(MainUiIntent.SaveGifCapture::class)
+    private fun onSaveGifCapture() {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        val state = uiState.settingsState.imageSendState
+        val gif = GifCaptureSettings.decode(
+            frames = state.gifFrames.trim().toIntOrNull() ?: 0,
+            minDelayMs = state.gifMinDelayMs.trim().toIntOrNull() ?: 0
+        )
+        AppModel.gifSampleFrames = gif.frames
+        AppModel.gifFrameDelayMs = gif.minDelayMs
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                imageSendState = MainImageSendState.withGif(state, gif)
+            )
+        ).setup()
+    }
+
     /** 切换是否开启全局 Debug 调试模式（影响日志捕获与详细错误输出）。 */
     @UiIntentObserver(MainUiIntent.ToggleDebugModeEnabled::class)
     private fun onToggleDebugModeEnabled(intent: MainUiIntent.ToggleDebugModeEnabled) {
@@ -1839,7 +1875,10 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
         allProviders: List<LLMProvider>
     ): MainSettingsState {
         return MainSettingsState(
-            imageSendState = MainImageSendState.from(ImageSendSettings.decode(AppModel.imageSendSettings)),
+            imageSendState = MainImageSendState.withGif(
+                MainImageSendState.from(ImageSendSettings.decode(AppModel.imageSendSettings)),
+                GifCaptureSettings.decode(AppModel.gifSampleFrames, AppModel.gifFrameDelayMs)
+            ),
             appearanceState = MainAppearanceSettingsState(
                 themeMode = mAppThemeManager.themeModeFlow.value,
                 backgroundState = resolveChatBackgroundState()

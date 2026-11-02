@@ -1537,4 +1537,8 @@
     <string name="feedback_desc_fork">"Probleme dieser inoffiziellen Version gehören hierher, nicht zum Original"</string>
     <string name="github_repo_label_fork">"Fork-Repository"</string>
     <string name="developer_contact_fork">"E-Mail des Fork-Autors"</string>
+    <string name="gif_capture_title">"Animierte Bilder"</string>
+    <string name="gif_capture_description">"Animierte GIFs werden in Einzelbilder zerlegt und zu einem Streifen zusammengesetzt, damit das Modell die Reihenfolge erkennt. Mehr Bilder kosten mehr Vision-Token."</string>
+    <string name="gif_capture_frames">"Anzahl Einzelbilder (1-6)"</string>
+    <string name="gif_capture_min_delay">"Minimale Bildverzögerung in ms (20-1000)"</string>
 </resources>

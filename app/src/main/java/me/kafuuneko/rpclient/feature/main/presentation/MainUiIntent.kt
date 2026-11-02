@@ -49,6 +49,11 @@ sealed class MainUiIntent {
 
     data object SaveImageSendLimits : MainUiIntent()
 
+    /** 修改动图抽帧参数草稿；field 只能是 frames 或 minDelayMs。 */
+    data class ChangeGifCapture(val field: String, val value: String) : MainUiIntent()
+
+    data object SaveGifCapture : MainUiIntent()
+
     /** 修改外接生图服务地址。 */
     data class ChangeImageGenBaseUrl(val value: String) : MainUiIntent()
 

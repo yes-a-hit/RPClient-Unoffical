@@ -42,7 +42,10 @@ import me.kafuuneko.rpclient.libs.room.repository.FileRepository
 class MessageImageRuntime(
     private val mContext: Context,
     private val mFiles: FileRepository,
-    private val mSettings: () -> ImageSendSettings = { ImageSendSettings.decode(AppModel.imageSendSettings) }
+    private val mSettings: () -> ImageSendSettings = { ImageSendSettings.decode(AppModel.imageSendSettings) },
+    private val mGifSettings: () -> GifCaptureSettings = {
+        GifCaptureSettings.decode(AppModel.gifSampleFrames, AppModel.gifFrameDelayMs)
+    }
 ) {
     /**
      * 请求 JSON 只在网络调用期间保留；旧进程中断留下的文件延迟回收。
@@ -372,22 +375,24 @@ class MessageImageRuntime(
      * 用 [Movie] 按时间轴取帧，而不是 [BitmapFactory]——后者只会给出第一帧，
      * 模型看到的就永远是开场画面，动图后半段表达的动作完全丢失。
      *
-     * 帧数固定为 [GIF_SAMPLE_FRAMES]，均匀铺满整个时长；单帧长边限制到发送尺寸，
+     * 帧数取 [GifCaptureSettings.frames]，均匀铺满整个时长；单帧长边限制到发送尺寸，
      * 避免一张动图把视觉 token 预算一口气吃光。
      */
     private suspend fun expandAnimated(file: File): List<LLMImageReference> {
+        val gif = mGifSettings()
+        val framesWanted = gif.frames
         val bytes = file.readBytes()
         val movie = bytes.inputStream().use { Movie.decodeStream(it) }
             ?: throw ImageRequestException(ImageRequestFailure.InvalidImage)
         val width = movie.width()
         val height = movie.height()
         if (width <= 0 || height <= 0) throw ImageRequestException(ImageRequestFailure.InvalidImage)
-        val times = GifFrameTiming.frameStartTimes(bytes).let { starts ->
-            if (starts.isNotEmpty()) sampleTimes(starts)
+        val times = GifFrameTiming.frameStartTimes(bytes, gif.minDelayMs).let { starts ->
+            if (starts.isNotEmpty()) sampleTimes(starts, framesWanted)
             // 自解析失败才退回 Movie：它的 duration 在不少 GIF 上是 0，只够兜底一帧
             else movie.duration().let { duration ->
                 if (duration <= 0) listOf(0)
-                else List(GIF_SAMPLE_FRAMES) { index -> duration * index / GIF_SAMPLE_FRAMES }
+                else List(framesWanted) { index -> duration * index / framesWanted }
             }
         }
         val edge = MessageImagePolicy.SEND_LONG_EDGE
@@ -435,11 +440,12 @@ class MessageImageRuntime(
      * 按索引均匀取（首帧、中间某帧、末帧），比按毫秒取稳：帧延迟极不均匀的 GIF
      * 按时间取容易三张全落在同一段静止画面里。帧数不够就直接全给。
      */
-    private fun sampleTimes(starts: List<Int>): List<Int> {
-        if (starts.size <= GIF_SAMPLE_FRAMES) return starts
+    private fun sampleTimes(starts: List<Int>, framesWanted: Int): List<Int> {
+        if (starts.size <= framesWanted) return starts
+        if (framesWanted <= 1) return listOf(starts.first())
         val last = starts.lastIndex
-        return List(GIF_SAMPLE_FRAMES) { index ->
-            starts[last * index / (GIF_SAMPLE_FRAMES - 1)]
+        return List(framesWanted) { index ->
+            starts[last * index / (framesWanted - 1)]
         }.distinct()
     }
 
@@ -574,14 +580,6 @@ class MessageImageRuntime(
     }
 
     private companion object {
-        /**
-         * GIF 抽帧数量。
-         *
-         * 取 3 帧是「看得出在动」与「别把视觉预算吃光」之间的折中：
-         * 1 帧等于没看懂动图，帧数再多模型也只会描述重复画面。
-         */
-        const val GIF_SAMPLE_FRAMES = 3
-
         /** 连环画里每两帧之间的白缝宽度，像素。太窄会糊成一片，太宽白白吃分辨率。 */
         const val STRIP_GAP_PX = 12
 

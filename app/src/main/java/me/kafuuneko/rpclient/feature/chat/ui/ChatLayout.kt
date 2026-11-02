@@ -62,6 +62,7 @@ import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -128,8 +129,10 @@ import me.kafuuneko.rpclient.feature.chat.presentation.ChatLorebookState
 import me.kafuuneko.rpclient.feature.chat.presentation.ChatPage
 import me.kafuuneko.rpclient.feature.chat.presentation.ChatUiIntent
 import me.kafuuneko.rpclient.feature.chat.presentation.ChatUiState
+import me.kafuuneko.rpclient.libs.AppModel
 import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.media.MessageImageState
+import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.model.MessageContentPart
 import me.kafuuneko.rpclient.ui.dialog.AppConfirmDialog
 import me.kafuuneko.rpclient.ui.dialog.AppDangerDialog
@@ -1348,6 +1351,8 @@ private fun ChatInputBar(
     emit: ChatUiIntent.() -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
+    // 动作列表存在 Kotpref 里，重组时不必每次解析一遍 JSON
+    val pokeActions = remember { PokeActions.parse(AppModel.pokeActions) }
     val sendButtonColor by animateColorAsState(
         targetValue = if (isGenerating) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         label = "sendButtonColor"
@@ -1484,6 +1489,20 @@ private fun ChatInputBar(
                                         ChatUiIntent.OpenGalleryPicker.emit()
                                     }
                                 )
+                                // 动作：单聊只有一个角色，点了就一定是冲他去的，
+                                // 不像群聊那样得先猜「对谁做」，所以放这里没问题。
+                                pokeActions.forEach { action ->
+                                    DropdownMenuItem(
+                                        text = { Text(action.label) },
+                                        leadingIcon = {
+                                            Icon(Icons.Rounded.TouchApp, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            menuExpanded = false
+                                            ChatUiIntent.PokeAction(action.id).emit()
+                                        }
+                                    )
+                                }
                             }
                         }
                     },

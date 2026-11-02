@@ -1541,4 +1541,8 @@ Abra as Configurações de Modelo para verificar a chave de API, a URL base, o n
     <string name="feedback_desc_fork">"Problemas desta versão não oficial vão aqui, não para o upstream"</string>
     <string name="github_repo_label_fork">"Repositório da versão modificada"</string>
     <string name="developer_contact_fork">"E-mail do autor da versão modificada"</string>
+    <string name="gif_capture_title">"Imagens animadas"</string>
+    <string name="gif_capture_description">"GIFs animados são divididos em quadros e unidos numa tira, para o modelo ver a ordem dos acontecimentos. Mais quadros custam mais tokens de visão."</string>
+    <string name="gif_capture_frames">"Quadros a amostrar (1-6)"</string>
+    <string name="gif_capture_min_delay">"Atraso mínimo do quadro em ms (20-1000)"</string>
 </resources>

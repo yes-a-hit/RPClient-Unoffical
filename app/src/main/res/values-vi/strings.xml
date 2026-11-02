@@ -1538,4 +1538,8 @@ Mở Cài đặt mô hình để kiểm tra khóa API, URL cơ sở, tên mô h�
     <string name="feedback_desc_fork">"Sự cố của bản không chính thức này báo ở đây, không báo cho bản gốc"</string>
     <string name="github_repo_label_fork">"Kho của bản chỉnh sửa"</string>
     <string name="developer_contact_fork">"Email tác giả bản chỉnh sửa"</string>
+    <string name="gif_capture_title">"Ảnh động"</string>
+    <string name="gif_capture_description">"GIF động được tách thành vài khung rồi ghép thành một dải để mô hình thấy được thứ tự. Càng nhiều khung càng tốn token thị giác."</string>
+    <string name="gif_capture_frames">"Số khung trích xuất (1-6)"</string>
+    <string name="gif_capture_min_delay">"Độ trễ khung tối thiểu, ms (20-1000)"</string>
 </resources>
