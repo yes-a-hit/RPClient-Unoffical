@@ -5,6 +5,11 @@ import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipInputStream
 
+/*
+ * 本文件由 AI（Claude）生成，作者已逐行审阅并在真机上验证过行为。
+ * 修改前请先看 DocumentTextTest，用例覆盖了标签识别、实体转义与空行压缩。
+ */
+
 /**
  * 把办公文档摊平成纯文本，喂给只能读文字的模型。
  *

@@ -1,5 +1,10 @@
 package me.kafuuneko.rpclient.libs.media
 
+/*
+ * 本文件由 AI（Claude）生成，作者已逐行审阅并在真机上验证过行为。
+ * 如需修改，请先看 GifFrameTimingTest 里的用例，它们描述了每个字段的预期。
+ */
+
 /**
  * 从 GIF 字节流里读出每一帧的显示时间。
  *
