@@ -755,9 +755,10 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             return
         }
         if (mImageCoordinator.state.processing) return
-        val action = PokeActions.parse(AppModel.pokeActions)
-            .firstOrNull { it.id == intent.actionId }
-            ?: PokeActions.parse(AppModel.pokeActions).firstOrNull()
+        // 用本会话这一份，不是全局：主人在这个会话里改过的动作必须立刻生效
+        val actions = uiState.sessionPokeActions
+        val action = actions.firstOrNull { it.id == intent.actionId }
+            ?: actions.firstOrNull()
             ?: return
         val poke = PokeActions.render(action, uiState.character.name)
         val reaction = AppModel.pokeReaction.trim()
