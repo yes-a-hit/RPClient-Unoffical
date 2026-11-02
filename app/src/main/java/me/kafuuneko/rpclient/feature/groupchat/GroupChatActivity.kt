@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,11 +27,9 @@ import me.kafuuneko.rpclient.libs.core.IViewEvent
 class GroupChatActivity : CoreActivityWithEvent() {
     private val mViewModel by viewModels<GroupChatViewModel>()
     private val mImagePicker = registerForActivityResult(
-        // 走系统文件/相册选择器而不是 Photo Picker：
-        // Photo Picker 只给一条照片流，用户没法点进「相册」目录挑图，
-        // 也没法选 GIF —— 只能一张张划。这里换成 OpenMultipleDocuments，
-        // 系统会给出完整的相册/文件夹导航。
-        ActivityResultContracts.OpenMultipleDocuments()
+        // 走系统 Photo Picker：一进来就是照片流，顶部能切相册。之前为拿到完整目录树
+        // 换成了 OpenMultipleDocuments，代价是丢了照片流的快速预览；按目录挑文件走「附加文件」。
+        ActivityResultContracts.PickMultipleVisualMedia(MaxPickedImages)
     ) { uris -> mViewModel.emit(GroupChatUiIntent.ImageAction(MessageImageAction.Picked(uris))) }
     private val mImageSaver = registerForActivityResult(
         CreateImageDocumentContract()
@@ -75,7 +74,8 @@ class GroupChatActivity : CoreActivityWithEvent() {
      */
     override suspend fun onReceivedViewEvent(viewEvent: IViewEvent) {
         when (viewEvent) {
-            GroupChatViewEvent.PickImages -> mImagePicker.launch(arrayOf("image/*"))
+            GroupChatViewEvent.PickImages ->
+                mImagePicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
             GroupChatViewEvent.OpenFilePicker -> mFilePicker.launch(arrayOf("*/*"))
             is GroupChatViewEvent.SaveImage -> mImageSaver.launch(viewEvent.metadata)
             is GroupChatViewEvent.CopyText -> copyText(viewEvent.text)
@@ -91,5 +91,8 @@ class GroupChatActivity : CoreActivityWithEvent() {
 
     companion object {
         const val EXTRA_SESSION_ID = "extra_group_chat_session_id"
+
+        /** 一次最多挑几张；与 MessageImagePolicy.MAX_IMAGES_PER_MESSAGE 对齐。 */
+        const val MaxPickedImages = 4
     }
 }

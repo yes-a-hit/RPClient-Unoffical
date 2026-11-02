@@ -372,15 +372,20 @@ class MessageImageRuntime(
      * 避免一张动图把视觉 token 预算一口气吃光。
      */
     private suspend fun expandAnimated(file: File): List<LLMImageReference> {
-        val movie = file.inputStream().use { Movie.decodeStream(it) }
+        val bytes = file.readBytes()
+        val movie = bytes.inputStream().use { Movie.decodeStream(it) }
             ?: throw ImageRequestException(ImageRequestFailure.InvalidImage)
         val width = movie.width()
         val height = movie.height()
         if (width <= 0 || height <= 0) throw ImageRequestException(ImageRequestFailure.InvalidImage)
-        val duration = movie.duration().coerceAtLeast(0)
-        // 时长为 0 表示单帧 GIF 或缺失帧延迟信息，此时只取开头一帧
-        val times = if (duration <= 0) listOf(0)
-        else List(GIF_SAMPLE_FRAMES) { index -> duration * index / GIF_SAMPLE_FRAMES }
+        val times = GifFrameTiming.frameStartTimes(bytes).let { starts ->
+            if (starts.isNotEmpty()) sampleTimes(starts)
+            // 自解析失败才退回 Movie：它的 duration 在不少 GIF 上是 0，只够兜底一帧
+            else movie.duration().let { duration ->
+                if (duration <= 0) listOf(0)
+                else List(GIF_SAMPLE_FRAMES) { index -> duration * index / GIF_SAMPLE_FRAMES }
+            }
+        }
         val edge = MessageImagePolicy.SEND_LONG_EDGE
         val scale = if (maxOf(width, height) > edge) edge.toFloat() / maxOf(width, height) else 1f
         val targetWidth = (width * scale).roundToInt().coerceAtLeast(1)
@@ -412,6 +417,20 @@ class MessageImageRuntime(
         }
         if (references.isEmpty()) throw ImageRequestException(ImageRequestFailure.InvalidImage)
         return references
+    }
+
+    /**
+     * 从每帧起始时间里挑出要送给模型的采样点。
+     *
+     * 按索引均匀取（首帧、中间某帧、末帧），比按毫秒取稳：帧延迟极不均匀的 GIF
+     * 按时间取容易三张全落在同一段静止画面里。帧数不够就直接全给。
+     */
+    private fun sampleTimes(starts: List<Int>): List<Int> {
+        if (starts.size <= GIF_SAMPLE_FRAMES) return starts
+        val last = starts.lastIndex
+        return List(GIF_SAMPLE_FRAMES) { index ->
+            starts[last * index / (GIF_SAMPLE_FRAMES - 1)]
+        }.distinct()
     }
 
     /** 在指定时间点把 [Movie] 的一帧画到 ARGB 位图上。 */

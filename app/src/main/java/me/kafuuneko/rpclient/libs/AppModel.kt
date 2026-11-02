@@ -379,6 +379,14 @@ Treat it as an instruction, not as manuscript text. Do not quote, repeat, explai
      */
     var pokeReaction by stringPref(default = "")
 
+    /**
+     * 「+」菜单里的动作预设，JSON 数组。
+     *
+     * 留空表示用 [me.kafuuneko.rpclient.libs.poke.PokeActions.DEFAULTS] 里那三条
+     * （戳一戳、摸头、捏脸）。用户改过之后整份以这里为准。
+     */
+    var pokeActions by stringPref(default = "")
+
     // 摘要目标字数限制，对应摘要提示词中的 {{words}}。
     var summaryWordsLimit by intPref(default = 500)
 

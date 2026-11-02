@@ -78,6 +78,8 @@ import me.kafuuneko.rpclient.libs.llm.model.LLMGenerationRequest
 import me.kafuuneko.rpclient.libs.llm.model.LLMStreamEvent
 import me.kafuuneko.rpclient.libs.room.model.MessageImageInput
 import me.kafuuneko.rpclient.libs.media.MessageImageRuntime
+import me.kafuuneko.rpclient.libs.poke.PokeAction
+import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.libs.prompt.INITIAL_SUMMARY_CANDIDATE_WINDOW_SIZE
 import me.kafuuneko.rpclient.libs.prompt.model.PromptInspection
 import me.kafuuneko.rpclient.libs.prompt.model.PromptOmissionReason
@@ -910,8 +912,11 @@ class GroupChatViewModel :
     private suspend fun onPokeMember(intent: GroupChatUiIntent.PokeMember) {
         val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
         if (!canPoke(uiState)) return
-        val template = AppModel.pokePrompt.ifBlank { "（戳了戳 {name}）" }
-        val poke = template.replace("{name}", intent.memberName)
+        val actions = loadPokeActions()
+        val action = intent.actionId.takeIf { it.isNotBlank() }
+            ?.let { id -> actions.firstOrNull { it.id == id } }
+            ?: actions.first()
+        val poke = PokeActions.render(action, intent.memberName)
         val reaction = AppModel.pokeReaction.trim()
         val text = if (reaction.isBlank()) poke else "$poke\n$reaction"
         // 戳是用户动作，写进草稿后照常发送
@@ -919,6 +924,21 @@ class GroupChatViewModel :
             conversationState = uiState.conversationState.copy(inputDraft = text)
         ).setup()
         onSendMessage()
+    }
+
+    /**
+     * 当前可用的动作列表。
+     *
+     * `pokePrompt` 是动作系统上线前的老配置，只覆盖「戳一戳」这一条的措辞：
+     * 用户当年填过就继续生效，不用逼他按新格式重填一遍。
+     */
+    private fun loadPokeActions(): List<PokeAction> {
+        val stored = PokeActions.parse(AppModel.pokeActions)
+        val legacy = AppModel.pokePrompt.trim()
+        if (legacy.isEmpty()) return stored
+        return stored.map { action ->
+            if (action.id == PokeActions.KEY_POKE) action.copy(template = legacy) else action
+        }
     }
 
     /** 生成中或没配模型时不能戳，免得点了没反应还看不出原因。 */

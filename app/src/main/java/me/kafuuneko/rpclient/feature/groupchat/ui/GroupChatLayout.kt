@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Image as ImageIcon
@@ -131,7 +132,9 @@ import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatPage
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatSettingsState
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatUiIntent
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatUiState
+import me.kafuuneko.rpclient.libs.AppModel
 import me.kafuuneko.rpclient.libs.core.ActivityPreview
+import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatActivationStrategy
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatCharacterCardMode
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatLorebookGroupItem
@@ -271,6 +274,11 @@ private fun GroupChatNormalView(
                     onImageAction = { emitIntent(GroupChatUiIntent.ImageAction(it)) },
                     onOpenFilePicker = { emitIntent(GroupChatUiIntent.OpenFilePicker) },
                     onOpenGalleryPicker = { emitIntent(GroupChatUiIntent.OpenGalleryPicker) },
+                    onPokeAction = { actionId, memberName ->
+                        emitIntent(GroupChatUiIntent.PokeMember(memberName, actionId))
+                    },
+                    members = state.members,
+                    selectedSpeakerId = state.conversationState.selectedSpeakerId,
                     canContinue = canContinue,
                     onContinue = { emitIntent(GroupChatUiIntent.ContinueLast) },
                     onSummarize = { emitIntent(GroupChatUiIntent.SummarizeNow) },
@@ -2042,12 +2050,17 @@ private fun Composer(
     onImageAction: (MessageImageAction) -> Unit,
     onOpenFilePicker: () -> Unit,
     onOpenGalleryPicker: () -> Unit,
+    onPokeAction: (String, String) -> Unit,
+    members: List<GroupChatMemberItem>,
+    selectedSpeakerId: Long?,
     canContinue: Boolean,
     onContinue: () -> Unit,
     onSummarize: () -> Unit,
     onImpersonate: () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
+    // 动作列表存在 Kotpref 里，读一次就够；每次重组都解析一遍 JSON 没意义
+    val pokeActions = remember { PokeActions.parse(AppModel.pokeActions) }
     val sendButtonColor by animateColorAsState(
         targetValue = if (generating) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         label = "sendButtonColor"
@@ -2182,6 +2195,25 @@ private fun Composer(
                                         onOpenGalleryPicker()
                                     }
                                 )
+                                // 动作：戳一戳、摸头、捏脸那些。对当前选中的发言人做；
+                                // 没选的话落到第一个在场成员，别让点了没反应。
+                                pokeActions.forEach { action ->
+                                    DropdownMenuItem(
+                                        text = { Text(action.label) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Rounded.TouchApp,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            menuExpanded = false
+                                            val target = members.firstOrNull { it.id == selectedSpeakerId }
+                                                ?: members.firstOrNull()
+                                            if (target != null) onPokeAction(action.id, target.name)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }

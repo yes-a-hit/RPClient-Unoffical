@@ -48,8 +48,8 @@ sealed class GroupChatUiIntent {
     /** 切换到指定场景；传 null 表示回到「不限场景」，全员在场。 */
     data class SwitchScene(val sceneId: String?) : GroupChatUiIntent()
 
-    /** 戳一戳某个成员；长按头像触发。 */
-    data class PokeMember(val memberName: String) : GroupChatUiIntent()
+    /** 对某个成员做一个动作；长按头像触发，或从「+」菜单里选动作。 */
+    data class PokeMember(val memberName: String, val actionId: String = "") : GroupChatUiIntent()
     data object StopGeneration : GroupChatUiIntent()
     data object SummarizeNow : GroupChatUiIntent()
     data object RestorePreviousSummary : GroupChatUiIntent()

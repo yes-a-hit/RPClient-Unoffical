@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,9 +28,9 @@ import me.kafuuneko.rpclient.libs.core.IViewEvent
 class ChatActivity : CoreActivityWithEvent() {
     private val mViewModel by viewModels<ChatViewModel>()
     private val mImagePicker = registerForActivityResult(
-        // 与群聊保持一致：用系统文件/相册选择器，能进相册目录、能选 GIF。
-        // Photo Picker 只给一条照片流，选图只能一张张划。
-        ActivityResultContracts.OpenMultipleDocuments()
+        // 走系统 Photo Picker：一进来就是照片流，顶部能切相册。之前为拿到完整目录树
+        // 换成了 OpenMultipleDocuments，代价是丢了照片流的快速预览；按目录挑文件走「附加文件」。
+        ActivityResultContracts.PickMultipleVisualMedia(MaxPickedImages)
     ) { uris ->
         mViewModel.emit(ChatUiIntent.ImageAction(MessageImageAction.Picked(uris)))
     }
@@ -92,7 +93,8 @@ class ChatActivity : CoreActivityWithEvent() {
     override suspend fun onReceivedViewEvent(viewEvent: IViewEvent) {
         // 图片保存使用本次原图的格式元数据，其他导出沿用各自的文档合约。
         when (viewEvent) {
-            ChatViewEvent.PickImages -> mImagePicker.launch(arrayOf("image/*"))
+            ChatViewEvent.PickImages ->
+                mImagePicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
 
             ChatViewEvent.OpenFilePicker -> mFilePicker.launch(arrayOf("*/*"))
 
@@ -124,5 +126,8 @@ class ChatActivity : CoreActivityWithEvent() {
 
     companion object {
         const val EXTRA_SESSION_ID = "extra_session_id"
+
+        /** 一次最多挑几张；与 MessageImagePolicy.MAX_IMAGES_PER_MESSAGE 对齐。 */
+        const val MaxPickedImages = 4
     }
 }
