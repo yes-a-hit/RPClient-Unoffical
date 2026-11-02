@@ -249,8 +249,9 @@ class MessageImageRuntime(
         return mFiles.prepareGenerated(prepared.ownerId) { target ->
             mFiles.withPreparedFile(prepared) { source ->
                 validate(source)
-                // 原图模式只复制已校验的字节，其他模式只在此次入库前执行一次压缩。
-                if (settings.mode == ImageSendMode.Original) {
+                // 动图不能走压缩：压缩是 decode 成 Bitmap 再编码，而 Bitmap 只有一帧，
+                // 存下来就变成静图，后面再怎么抽帧也只剩第一张。所以动图一律原样复制。
+                if (settings.mode == ImageSendMode.Original || isAnimated(source)) {
                     validateSendable(source)
                     source.inputStream().use { input -> target.outputStream().use { input.copyTo(it) } }
                 } else {
@@ -260,6 +261,9 @@ class MessageImageRuntime(
             }
         }
     }
+
+    /** 这份文件是不是会动的图。目前只认 GIF——它也是唯一一个走抽帧的格式。 */
+    private fun isAnimated(file: File): Boolean = bounds(file).outMimeType == "image/gif"
 
     /**
      * 按需加载列表缩略图或查看器版本；失败返回 null，由 UI 显示缺图占位。
@@ -388,35 +392,41 @@ class MessageImageRuntime(
         }
         val edge = MessageImagePolicy.SEND_LONG_EDGE
         val scale = if (maxOf(width, height) > edge) edge.toFloat() / maxOf(width, height) else 1f
-        val targetWidth = (width * scale).roundToInt().coerceAtLeast(1)
-        val targetHeight = (height * scale).roundToInt().coerceAtLeast(1)
-        val references = mutableListOf<LLMImageReference>()
-        for (time in times) {
+        val frameWidth = (width * scale).roundToInt().coerceAtLeast(1)
+        val frameHeight = (height * scale).roundToInt().coerceAtLeast(1)
+        // 拼成一张横向连环画，而不是发三张互不相干的图。
+        // 三张独立的图在模型眼里是「三个画面」，它不会自己想到这三张是同一张动图的三个时刻，
+        // 于是照样答「图里有一条鱼」；连成一排才看得出「它先这样、再这样、最后这样」。
+        val frames = times.mapNotNull { time ->
             currentCoroutineContext().ensureActive()
-            val frame = renderFrame(movie, time, targetWidth, targetHeight)
-                ?: continue
-            val temp = File.createTempFile("gif-frame-", ".png", mContext.cacheDir)
-            try {
-                FileOutputStream(temp).use { output ->
-                    if (!frame.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                        throw ImageRequestException(ImageRequestFailure.InvalidImage)
-                    }
-                }
-            } finally {
-                frame.recycle()
-            }
-            try {
-                // 每帧单独入库，下游按 UUID 取文件转 Base64 的链路完全不用改
-                val frameUuid = mFiles.saveFile(temp, "image/png")
-                references += LLMImageReference(
-                    frameUuid, "image/png", targetWidth, targetHeight, temp.length()
-                )
-            } finally {
-                temp.delete()
-            }
+            renderFrame(movie, time, frameWidth, frameHeight)
         }
-        if (references.isEmpty()) throw ImageRequestException(ImageRequestFailure.InvalidImage)
-        return references
+        if (frames.isEmpty()) throw ImageRequestException(ImageRequestFailure.InvalidImage)
+        val gap = STRIP_GAP_PX
+        val stripWidth = frameWidth * frames.size + gap * (frames.size - 1)
+        val strip = Bitmap.createBitmap(stripWidth, frameHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(strip)
+        canvas.drawColor(Color.WHITE)
+        frames.forEachIndexed { index, frame ->
+            canvas.drawBitmap(frame, (frameWidth + gap) * index.toFloat(), 0f, null)
+        }
+        frames.forEach { it.recycle() }
+        val temp = File.createTempFile("gif-strip-", ".png", mContext.cacheDir)
+        try {
+            FileOutputStream(temp).use { output ->
+                if (!strip.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                    throw ImageRequestException(ImageRequestFailure.InvalidImage)
+                }
+            }
+        } finally {
+            strip.recycle()
+        }
+        return try {
+            val stripUuid = mFiles.saveFile(temp, "image/png")
+            listOf(LLMImageReference(stripUuid, "image/png", stripWidth, frameHeight, temp.length()))
+        } finally {
+            temp.delete()
+        }
     }
 
     /**
@@ -447,11 +457,13 @@ class MessageImageRuntime(
     /** 原图模式与历史读取共用协议支持范围，禁止发送不支持或超过硬上限的文件。 */
     private fun validateSendable(file: File) {
         val bounds = bounds(file)
-        if (bounds.outMimeType !in setOf("image/jpeg", "image/png", "image/webp")) {
+        // GIF 也在白名单里：它不进压缩（压了就变静图），原字节直发；
+        // 上限比静图宽，动图本来就大。
+        if (bounds.outMimeType !in setOf("image/jpeg", "image/png", "image/webp", "image/gif")) {
             throw ImageRequestException(ImageRequestFailure.OriginalUnsupported)
         }
-        if (file.length() > MessageImagePolicy.MAX_SEND_BYTES ||
-            maxOf(bounds.outWidth, bounds.outHeight) > 8000) {
+        val limit = if (bounds.outMimeType == "image/gif") MAX_GIF_BYTES else MessageImagePolicy.MAX_SEND_BYTES
+        if (file.length() > limit || maxOf(bounds.outWidth, bounds.outHeight) > 8000) {
             throw ImageRequestException(ImageRequestFailure.OriginalTooLarge)
         }
     }
@@ -569,5 +581,11 @@ class MessageImageRuntime(
          * 1 帧等于没看懂动图，帧数再多模型也只会描述重复画面。
          */
         const val GIF_SAMPLE_FRAMES = 3
+
+        /** 连环画里每两帧之间的白缝宽度，像素。太窄会糊成一片，太宽白白吃分辨率。 */
+        const val STRIP_GAP_PX = 12
+
+        /** 动图原字节直发时的体积上限，比静图宽——GIF 压缩率本来就差。 */
+        const val MAX_GIF_BYTES = 12L * 1024 * 1024
     }
 }

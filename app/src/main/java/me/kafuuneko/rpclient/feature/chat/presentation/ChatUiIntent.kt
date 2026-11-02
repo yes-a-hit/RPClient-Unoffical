@@ -56,6 +56,9 @@ sealed class ChatUiIntent {
     /** 图库挑选结果：文件 UUID，按用户勾选顺序。 */
     data class AttachGalleryImages(val uuids: List<String>) : ChatUiIntent()
 
+    /** 撤掉一份已附加的文档；按列表位置定位，重名文件互不影响。 */
+    data class RemoveAttachedDocument(val index: Int) : ChatUiIntent()
+
     data class ChangeSessionLorebookDialogQuery(val value: String) : ChatUiIntent()
 
     data class ToggleSessionLorebookDialogEntry(val entryId: Long) : ChatUiIntent()

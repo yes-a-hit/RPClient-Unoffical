@@ -72,6 +72,7 @@ import me.kafuuneko.rpclient.libs.llm.classifyGenerationFailure
 import me.kafuuneko.rpclient.libs.llm.model.LLMGenerationRequest
 import me.kafuuneko.rpclient.libs.llm.model.LLMStreamEvent
 import me.kafuuneko.rpclient.libs.llm.model.isOutputTokenLimitReached
+import me.kafuuneko.rpclient.libs.media.AttachedDocument
 import me.kafuuneko.rpclient.libs.media.DocumentText
 import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.media.MessageImageCoordinator
@@ -248,8 +249,12 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
     }
 
     /**
-     * 把选中的文本文件内容读进输入框草稿，作为一条可编辑的消息发送；
-     * 二进制文件（含 NUL 字节）或读取失败的文件会被跳过，全部失败时提示。
+     * 把选中的文件分两路处理：图片交给图片管线，其余作为文档附件挂在输入框旁边。
+     *
+     * 文档不写进输入框。几万字的正文塞进 `TextField` 既看不清也改不动，
+     * 用户想要的是「把这份东西给角色读」，不是「把正文贴进聊天框」。
+     * 所以这里只存文件名与正文，UI 上显示成一条可删除的附件，
+     * 发送时再由 [onSendMessage] 拼进消息体。
      */
     @UiIntentObserver(ChatUiIntent.FilesPicked::class)
     private suspend fun onFilesPicked(intent: ChatUiIntent.FilesPicked) {
@@ -260,24 +265,38 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         if (images.isNotEmpty()) mImageCoordinator.handle(MessageImageAction.Picked(images))
         val documents = intent.uris.filterNot { isImageUri(it) }
         if (documents.isEmpty()) return
-        val read = withContext(Dispatchers.IO) {
+        val read: List<AttachedDocument> = withContext(Dispatchers.IO) {
             documents.mapNotNull { uri ->
+                val name = displayNameOf(uri) ?: "未命名文件"
                 // docx 是 zip，当文本读只会得到乱码，单独抽正文
-                if (DocumentText.isDocx(displayNameOf(uri))) DocumentText.readDocx(mContext.contentResolver, uri)
-                else readTextFileContent(uri)
+                val text = if (DocumentText.isDocx(name)) {
+                    DocumentText.readDocx(mContext.contentResolver, uri)
+                } else {
+                    readTextFileContent(uri)
+                }
+                text?.takeIf { it.isNotBlank() }?.let { AttachedDocument(name, it) }
             }
         }
         if (read.isEmpty()) {
             AppViewEvent.PopupToastMessage(mContext.getString(R.string.attach_file_unsupported)).tryEmit()
             return
         }
-        val draft = uiState.conversationState.inputDraft
-        val merged = if (draft.isBlank()) {
-            read.joinToString("\n\n")
-        } else {
-            draft + "\n\n" + read.joinToString("\n\n")
-        }
-        uiState.copy(conversationState = uiState.conversationState.copy(inputDraft = merged)).setup()
+        uiState.copy(
+            conversationState = uiState.conversationState.copy(
+                attachedDocuments = uiState.conversationState.attachedDocuments + read
+            )
+        ).setup()
+    }
+
+    /** 撤掉一份文档附件。 */
+    @UiIntentObserver(ChatUiIntent.RemoveAttachedDocument::class)
+    private suspend fun onRemoveAttachedDocument(intent: ChatUiIntent.RemoveAttachedDocument) {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        val remaining = uiState.conversationState.attachedDocuments
+            .filterIndexed { index, _ -> index != intent.index }
+        uiState.copy(
+            conversationState = uiState.conversationState.copy(attachedDocuments = remaining)
+        ).setup()
     }
 
     /**
@@ -591,8 +610,23 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         if (!ensureProviderConfigured(sessionId, uiState.character.id)) return
         if (mImageCoordinator.state.processing) return
         val images = mImageCoordinator.draftInputs()
-        val rawInput = uiState.conversationState.inputDraft.trim()
-            .ifBlank { if (images.isEmpty()) AppModel.replaceEmptyMessagePrompt.trim() else "" }
+        val attachments = uiState.conversationState.attachedDocuments
+        // 文档附件的正文只在这一步拼进来：输入框保持干净，消息里保留完整内容。
+        val rawInput = (
+            uiState.conversationState.inputDraft.trim()
+                .ifBlank {
+                    if (images.isEmpty() && attachments.isEmpty()) {
+                        AppModel.replaceEmptyMessagePrompt.trim()
+                    } else {
+                        ""
+                    }
+                } +
+                if (attachments.isEmpty()) {
+                    ""
+                } else {
+                    "\n\n" + attachments.joinToString("\n\n") { it.renderForMessage() }
+                }
+            ).trim()
         // 若最终输入为空，退化为续写角色消息
         if (rawInput.isBlank() && images.isEmpty()) {
             continueLastAssistantMessage(sessionId)
