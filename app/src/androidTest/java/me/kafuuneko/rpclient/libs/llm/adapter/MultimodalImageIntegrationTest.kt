@@ -227,7 +227,7 @@ class MultimodalImageIntegrationTest {
         database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         logDatabase = Room.inMemoryDatabaseBuilder(context, RequestLogDatabase::class.java).build()
         files = FileRepository(context, database)
-        media = MessageImageRuntime(context, files) { ImageSendSettings() }
+        media = MessageImageRuntime(context, files, mSettings = { ImageSendSettings() })
         chat = ChatRepository(database, Gson(), MessageImageRepository(database, files))
         logs = LLMRequestLogRepository(logDatabase)
         val characterId = database.getCharacterDao().insertOrReplace(Character(name = "test", avatar = "", characterTags = "[]",
@@ -265,7 +265,7 @@ class MultimodalImageIntegrationTest {
             saveAttributes()
         }
         var settings = ImageSendSettings(ImageSendMode.Original)
-        val runtime = MessageImageRuntime(context, files) { settings }
+        val runtime = MessageImageRuntime(context, files, mSettings = { settings })
         val prepared = runtime.prepare("settings", Uri.fromFile(original))
         val saved = runtime.submit(listOf(MessageImageInput.Prepared(prepared))) {
             chat.createUserMessageWithImages(sessionId, "", it.filterIsInstance<MessageImageInput.Prepared>())
@@ -308,11 +308,12 @@ class MultimodalImageIntegrationTest {
         bitmap.recycle()
         assertTrue(original.length() > 2L * 1024 * 1024)
         var settings = ImageSendSettings(ImageSendMode.Original)
-        val runtime = MessageImageRuntime(context, files) { settings }
+        val runtime = MessageImageRuntime(context, files, mSettings = { settings })
         val coordinator = MessageImageCoordinator(runtime, files) {}
         coordinator.choose(editing = false)
         coordinator.handle(MessageImageAction.Picked(listOf(Uri.fromFile(original))))
-        val source = coordinator.draftInputs().single().value
+        // 这里只可能落到 Prepared：刚刚从本地文件选进来，还没进过库
+        val source = (coordinator.draftInputs().single() as MessageImageInput.Prepared).value
         assertEquals(1, coordinator.state.draft.size)
         // 选图不预生成发送文件；失败不能创建空消息或丢失用户草稿。
         val failure = runCatching {
@@ -347,10 +348,10 @@ class MultimodalImageIntegrationTest {
         val first = media.prepare("batch", Uri.fromFile(fixture(jpeg = true)))
         val second = media.prepare("batch", Uri.fromFile(fixture()))
         var reads = 0
-        val runtime = MessageImageRuntime(context, files) {
+        val runtime = MessageImageRuntime(context, files, mSettings = {
             reads++
             ImageSendSettings(ImageSendMode.Custom, 64, if (reads == 1) 128 else 256, 128)
-        }
+        })
         val inputs = listOf(first, second).map(MessageImageInput::Prepared)
         val saved = runtime.submit(inputs) {
             chat.createUserMessageWithImages(sessionId, "", it.filterIsInstance<MessageImageInput.Prepared>())
@@ -397,7 +398,7 @@ class MultimodalImageIntegrationTest {
     @Test
     fun editingKeepsExistingBytesAndRollsBackBeforeReleasingRemovedImages() = runBlocking {
         var settings = ImageSendSettings(ImageSendMode.Original)
-        val runtime = MessageImageRuntime(context, files) { settings }
+        val runtime = MessageImageRuntime(context, files, mSettings = { settings })
         val coordinator = MessageImageCoordinator(runtime, files) {}
         coordinator.choose(editing = false)
         coordinator.handle(MessageImageAction.Picked(listOf(Uri.fromFile(fixture(true)), Uri.fromFile(fixture()))))

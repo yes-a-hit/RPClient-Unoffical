@@ -1537,4 +1537,7 @@
     <string name="gif_capture_frames">"추출할 프레임 수 (1-6)"</string>
     <string name="gif_capture_min_delay">"최소 프레임 지연(밀리초, 20-1000)"</string>
     <string name="poke_actions_global_subtitle">"모든 개인 채팅에 적용됩니다. 현재 %1$d개 동작."</string>
+    <string name="poke_actions_session_own">"이 채팅에서만"</string>
+    <string name="poke_actions_session_inherit">"전역 설정을 따르는 중"</string>
+    <string name="poke_actions_follow_global">"전역 설정으로 되돌리기"</string>
 </resources>

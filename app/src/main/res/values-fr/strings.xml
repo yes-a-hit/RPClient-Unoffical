@@ -1543,4 +1543,7 @@
     <string name="gif_capture_frames">"Nombre d'images (1-6)"</string>
     <string name="gif_capture_min_delay">"Délai minimal d'une image en ms (20-1000)"</string>
     <string name="poke_actions_global_subtitle">"Utilisé par toutes les conversations individuelles. %1$d actions configurées."</string>
+    <string name="poke_actions_session_own">"Uniquement dans ce chat"</string>
+    <string name="poke_actions_session_inherit">"Suit les valeurs globales"</string>
+    <string name="poke_actions_follow_global">"Revenir aux valeurs globales"</string>
 </resources>

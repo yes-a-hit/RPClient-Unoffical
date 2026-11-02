@@ -74,7 +74,7 @@ import me.kafuuneko.rpclient.libs.room.migration.AppDatabaseAutoMigration3To4Spe
         LLMTokenUsageRecord::class,
         MessageImageEntity::class
     ],
-    version = 6,
+    version = 7,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabaseAutoMigration1To2Spec::class),
         AutoMigration(from = 2, to = 3, spec = AppDatabaseAutoMigration2To3Spec::class),
@@ -82,6 +82,8 @@ import me.kafuuneko.rpclient.libs.room.migration.AppDatabaseAutoMigration3To4Spe
         AutoMigration(from = 4, to = 5)
         // 5→6 改为手写 Migration（AppDatabaseMigration5To6）：库里存在两个结构不同却都叫
         // version 5 的历史版本，自动迁移只看版本号会跳过列检查，导致那批库升级后打不开。
+        // 6→7 同样手写（AppDatabaseMigration6To7），沿用同一套「列不存在才加」的判断，
+        // 免得从各种中间版本升上来的库各撞一次。
     ],
     exportSchema = true
 )

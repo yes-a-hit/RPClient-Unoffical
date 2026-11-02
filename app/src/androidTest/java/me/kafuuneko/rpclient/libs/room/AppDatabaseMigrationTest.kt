@@ -329,10 +329,40 @@ class AppDatabaseMigrationTest {
         }
     }
 
+    /**
+     * v6→v7：单聊会话要多一列 `pokeActionsJson`，默认空串表示跟随全局。
+     *
+     * 老库升上来全是空串，行为与升级前完全一致；这条用例守住「默认值必须是空串」，
+     * 因为一旦写成 null 或某个 JSON，所有历史会话都会突然变成「有独立配置」。
+     */
+    @Test
+    fun migrate6To7_addsSessionPokeActionsColumn() {
+        val name = PokeMigrationDatabaseName
+        migrationHelper.createDatabase(name, 6).apply {
+            execSQL(
+                """
+                INSERT INTO chat_sessions (
+                    id, characterId, createTime, latestTime, lorebookEntrySet, title,
+                    userNote, userName, userDescription, creatorNotes, worldInfoStateJson,
+                    autoSummaryPaused
+                ) VALUES (801, 1, 1, 2, '[]', 'legacy', '', 'You', '', NULL, '{}', 0)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(name, 7, true)
+        migrated.query("SELECT pokeActionsJson FROM chat_sessions WHERE id = 801").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("", cursor.getString(0))
+        }
+    }
+
     private companion object {
         const val DatabaseName = "app-migration-test"
         const val RegexDatabaseName = "app-regex-migration-test"
         const val TokenUsageDatabaseName = "app-token-usage-migration-test"
         const val SceneDatabaseName = "app-scene-migration-test"
+        const val PokeMigrationDatabaseName = "app-poke-migration-test"
     }
 }

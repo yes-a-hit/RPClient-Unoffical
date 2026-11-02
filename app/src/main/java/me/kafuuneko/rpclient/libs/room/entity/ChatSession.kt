@@ -51,7 +51,9 @@ data class ChatSession(
     // 世界书 timed effects 运行时状态，保存 sticky/cooldown 的有效期；不是用户可编辑内容。
     val worldInfoStateJson: String = "{}",
     // 是否仅暂停当前会话的自动总结；手动总结不受影响。
-    val autoSummaryPaused: Boolean = false
+    val autoSummaryPaused: Boolean = false,
+    // 本会话自己的动作预设；空串表示跟随全局设置
+    val pokeActionsJson: String = ""
 ) {
     /** 将空白 creator notes 覆盖归一化为 null，使读取时继续继承角色卡默认值。 */
     fun withNormalizedCreatorNotes(): ChatSession {

@@ -1521,4 +1521,7 @@ Apri le impostazioni del modello per verificare la chiave API, l\'URL di base, i
     <string name="gif_capture_frames">"Fotogrammi da campionare (1-6)"</string>
     <string name="gif_capture_min_delay">"Ritardo minimo del fotogramma in ms (20-1000)"</string>
     <string name="poke_actions_global_subtitle">"Usato da tutte le chat singole. %1$d azioni configurate."</string>
+    <string name="poke_actions_session_own">"Solo in questa chat"</string>
+    <string name="poke_actions_session_inherit">"Segue le impostazioni globali"</string>
+    <string name="poke_actions_follow_global">"Torna alle impostazioni globali"</string>
 </resources>

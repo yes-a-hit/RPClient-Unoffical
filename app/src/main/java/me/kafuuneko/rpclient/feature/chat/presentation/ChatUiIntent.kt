@@ -158,6 +158,9 @@ sealed class ChatUiIntent {
 
     data object SavePokeActions : ChatUiIntent()
 
+    /** 丢掉本会话的动作配置，恢复成跟随全局。 */
+    data object ResetSessionPokeActions : ChatUiIntent()
+
     data class SaveUserName(val value: String) : ChatUiIntent()
 
     data class SaveUserDescription(val value: String) : ChatUiIntent()

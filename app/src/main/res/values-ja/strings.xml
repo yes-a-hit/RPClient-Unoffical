@@ -1538,4 +1538,7 @@
     <string name="gif_capture_frames">"抽出コマ数（1-6）"</string>
     <string name="gif_capture_min_delay">"フレーム遅延の下限（ミリ秒、20-1000）"</string>
     <string name="poke_actions_global_subtitle">"すべての個人チャットで使われます。現在 %1$d 個のアクション。"</string>
+    <string name="poke_actions_session_own">"このチャットのみ"</string>
+    <string name="poke_actions_session_inherit">"グローバル設定に従っています"</string>
+    <string name="poke_actions_follow_global">"グローバル設定に戻す"</string>
 </resources>

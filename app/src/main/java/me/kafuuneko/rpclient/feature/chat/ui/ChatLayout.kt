@@ -60,6 +60,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.TouchApp
@@ -196,6 +197,8 @@ fun ChatLayout(
                     lorebookState = uiState.lorebookState,
                     loadState = uiState.loadState,
                     pokeActionDrafts = uiState.pokeActionDrafts,
+                    sessionPokeActions = uiState.sessionPokeActions,
+                    usesOwnPokeActions = uiState.usesOwnPokeActions,
                     emit = emit
                 )
             }
@@ -430,6 +433,7 @@ private fun ChatNormal(
             hasAssistantMessage = state.conversationState.hasAssistantMessage,
             imageState = state.imageState,
             documents = state.conversationState.attachedDocuments,
+            pokeActions = state.sessionPokeActions,
             emit = emit
         )
     }
@@ -1378,11 +1382,10 @@ private fun ChatInputBar(
     hasAssistantMessage: Boolean,
     imageState: MessageImageState,
     documents: List<me.kafuuneko.rpclient.libs.media.AttachedDocument>,
+    pokeActions: List<PokeAction>,
     emit: ChatUiIntent.() -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
-    // 动作列表存在 Kotpref 里，重组时不必每次解析一遍 JSON
-    val pokeActions = remember { PokeActions.parse(AppModel.pokeActions) }
     val sendButtonColor by animateColorAsState(
         targetValue = if (isGenerating) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         label = "sendButtonColor"
@@ -1592,6 +1595,8 @@ private fun ChatSettingsPage(
     lorebookState: ChatLorebookState,
     loadState: ChatLoadState,
     pokeActionDrafts: List<PokeAction>,
+    sessionPokeActions: List<PokeAction>,
+    usesOwnPokeActions: Boolean,
     emit: ChatUiIntent.() -> Unit
 ) {
     Column(
@@ -1662,18 +1667,19 @@ private fun ChatSettingsPage(
                 }
             }
             item {
-                // 动作预设：群聊侧只按默认动作触发，编辑入口留在这里，
-                // 因为单人对话才有「对某个角色做什么」的指向性。
+                // 动作预设：这只是「本会话」的那一份，全局默认在设置页里改。
+                // 单人对话只有一个角色，带 {name} 的动作在这里也有明确落点，全都列出来。
                 SettingsSection(title = stringResource(R.string.poke_actions_title)) {
                     Text(
-                        text = stringResource(R.string.poke_actions_subtitle),
+                        text = if (usesOwnPokeActions) {
+                            stringResource(R.string.poke_actions_session_own)
+                        } else {
+                            stringResource(R.string.poke_actions_session_inherit)
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    val actions = remember(pokeActionDrafts) {
-                        PokeActions.parse(AppModel.pokeActions)
-                    }
-                    actions.forEach { action ->
+                    sessionPokeActions.forEach { action ->
                         MenuAction(
                             icon = Icons.Rounded.TouchApp,
                             title = action.label,
@@ -1684,6 +1690,12 @@ private fun ChatSettingsPage(
                         icon = Icons.Rounded.Edit,
                         title = stringResource(R.string.poke_actions_edit)
                     ) { ChatUiIntent.OpenPokeActionEditor.emit() }
+                    if (usesOwnPokeActions) {
+                        MenuAction(
+                            icon = Icons.Rounded.RestartAlt,
+                            title = stringResource(R.string.poke_actions_follow_global)
+                        ) { ChatUiIntent.ResetSessionPokeActions.emit() }
+                    }
                 }
             }
             item {

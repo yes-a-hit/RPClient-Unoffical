@@ -1537,4 +1537,7 @@
     <string name="gif_capture_frames">"抽幀數量（1-6）"</string>
     <string name="gif_capture_min_delay">"幀延遲下限，毫秒（20-1000）"</string>
     <string name="poke_actions_global_subtitle">"所有單人會話預設使用這一套，目前 %1$d 個動作。"</string>
+    <string name="poke_actions_session_own">"本會話單獨設定"</string>
+    <string name="poke_actions_session_inherit">"目前跟隨全域預設"</string>
+    <string name="poke_actions_follow_global">"恢復跟隨全域"</string>
 </resources>

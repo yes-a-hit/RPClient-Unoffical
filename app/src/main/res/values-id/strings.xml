@@ -1543,4 +1543,7 @@ Buka Pengaturan Model untuk memeriksa kunci API, URL dasar, nama model, dan izin
     <string name="gif_capture_frames">"Jumlah bingkai (1-6)"</string>
     <string name="gif_capture_min_delay">"Jeda bingkai minimum dalam ms (20-1000)"</string>
     <string name="poke_actions_global_subtitle">"Dipakai di semua obrolan pribadi. %1$d aksi terpasang."</string>
+    <string name="poke_actions_session_own">"Hanya di chat ini"</string>
+    <string name="poke_actions_session_inherit">"Mengikuti pengaturan global"</string>
+    <string name="poke_actions_follow_global">"Kembali ke pengaturan global"</string>
 </resources>

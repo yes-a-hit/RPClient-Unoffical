@@ -1544,4 +1544,7 @@
     <string name="gif_capture_frames">"Fotogramas a muestrear (1-6)"</string>
     <string name="gif_capture_min_delay">"Retardo mínimo del fotograma en ms (20-1000)"</string>
     <string name="poke_actions_global_subtitle">"Se usa en todos los chats individuales. %1$d acciones configuradas."</string>
+    <string name="poke_actions_session_own">"Solo en este chat"</string>
+    <string name="poke_actions_session_inherit">"Siguiendo los valores globales"</string>
+    <string name="poke_actions_follow_global">"Volver a los valores globales"</string>
 </resources>

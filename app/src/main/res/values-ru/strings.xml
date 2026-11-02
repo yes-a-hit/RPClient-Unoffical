@@ -1547,4 +1547,7 @@
     <string name="gif_capture_frames">"Число кадров (1-6)"</string>
     <string name="gif_capture_min_delay">"Минимальная задержка кадра, мс (20-1000)"</string>
     <string name="poke_actions_global_subtitle">"Используется во всех личных чатах. Настроено действий: %1$d."</string>
+    <string name="poke_actions_session_own">"Только в этом чате"</string>
+    <string name="poke_actions_session_inherit">"Используются глобальные настройки"</string>
+    <string name="poke_actions_follow_global">"Вернуть глобальные настройки"</string>
 </resources>

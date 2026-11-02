@@ -1595,4 +1595,7 @@
     <string name="gif_capture_frames">"Frames to sample (1-6)"</string>
     <string name="gif_capture_min_delay">"Minimum frame delay in ms (20-1000)"</string>
     <string name="poke_actions_global_subtitle">"Used by every single chat. %1$d actions configured."</string>
+    <string name="poke_actions_session_own">"In this chat only"</string>
+    <string name="poke_actions_session_inherit">"Following the global defaults"</string>
+    <string name="poke_actions_follow_global">"Follow global defaults"</string>
 </resources>

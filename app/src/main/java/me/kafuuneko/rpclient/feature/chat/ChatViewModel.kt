@@ -652,13 +652,20 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         onSendMessage()
     }
 
-    /** 动作列表的编辑：与群聊共用同一份全局列表，改一处两边都生效。 */
+    /**
+     * 动作列表的编辑。
+     *
+     * 每个会话保存自己的一份：同一张角色卡换个剧本，摸头的措辞就该不一样。
+     * 会话里没存过就从全局那份拷一份当起点，改完只落在本会话，不动全局。
+     */
     @UiIntentObserver(ChatUiIntent.OpenPokeActionEditor::class)
     private suspend fun onOpenPokeActionEditor() {
         val uiState = getOrNull<ChatUiState.Normal>() ?: return
         uiState.copy(
             pokeActionEditorVisible = true,
-            pokeActionDrafts = PokeActions.parse(AppModel.pokeActions)
+            pokeActionDrafts = uiState.sessionPokeActions.ifEmpty {
+                PokeActions.parse(AppModel.pokeActions)
+            }
         ).setup()
     }
 
@@ -713,11 +720,24 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             AppViewEvent.PopupToastMessageByResId(R.string.poke_actions_need_one).tryEmit()
             return
         }
-        AppModel.pokeActions = PokeActions.serialize(drafts)
-        uiState.copy(
-            pokeActionEditorVisible = false,
-            pokeActionDrafts = emptyList()
-        ).setup()
+        val sessionId = mSessionId ?: return
+        val session = mChatRepository.getSessionById(sessionId) ?: return
+        // 只写本会话，全局那份保持原样
+        mChatRepository.updateSession(
+            session.copy(pokeActionsJson = PokeActions.serialize(drafts))
+        )
+        refreshUiState(sessionId)
+    }
+
+    /** 放弃本会话的动作配置，回到跟随全局。 */
+    @UiIntentObserver(ChatUiIntent.ResetSessionPokeActions::class)
+    private suspend fun onResetSessionPokeActions() {
+        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        val sessionId = mSessionId ?: return
+        val session = mChatRepository.getSessionById(sessionId) ?: return
+        mChatRepository.updateSession(session.copy(pokeActionsJson = ""))
+        uiState.copy(pokeActionEditorVisible = false, pokeActionDrafts = emptyList()).setup()
+        refreshUiState(sessionId)
     }
 
     /**
@@ -2855,6 +2875,11 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             mFileRepository.loadAvatarBitmap(it)?.asImageBitmap()
         }
         val hasAvailableProvider = mProviderSelectionResolver.getCharacterProviderOrNull(character) != null
+        // 动作：会话里存了就用会话的，空串表示跟随全局。
+        // 全局那份是「我对所有角色都这样」，会话那份是「这张卡的剧本里得这么说」。
+        val sessionPokeActions = session.pokeActionsJson.takeIf { it.isNotBlank() }
+            ?.let { PokeActions.parse(it) }
+            ?: PokeActions.parse(AppModel.pokeActions)
         // 组装并返回 Normal UI 状态
         return ChatUiState.Normal(
             imageState = mImageCoordinator.state,
@@ -2901,6 +2926,8 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             hasPromptInspection = mLastPromptInspection != null,
             hasAvailableProvider = hasAvailableProvider,
             dialogState = dialogState,
+            sessionPokeActions = sessionPokeActions,
+            usesOwnPokeActions = session.pokeActionsJson.isNotBlank(),
             backgroundState = resolveBackgroundState()
         )
     }

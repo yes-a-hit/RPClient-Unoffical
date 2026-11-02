@@ -59,6 +59,7 @@ import me.kafuuneko.rpclient.libs.regex.RegexScriptRuntime
 import me.kafuuneko.rpclient.libs.room.AppDatabase
 import me.kafuuneko.rpclient.libs.room.RequestLogDatabase
 import me.kafuuneko.rpclient.libs.room.migration.AppDatabaseMigration5To6
+import me.kafuuneko.rpclient.libs.room.migration.AppDatabaseMigration6To7
 import me.kafuuneko.rpclient.libs.room.repository.CharacterRepository
 import me.kafuuneko.rpclient.libs.room.repository.ChatRepository
 import me.kafuuneko.rpclient.libs.room.repository.FileRepository
@@ -224,7 +225,7 @@ internal val appModules = module {
 
     single {
         Room.databaseBuilder(get(), AppDatabase::class.java, "primary.sqlite")
-            .addMigrations(AppDatabaseMigration5To6)
+            .addMigrations(AppDatabaseMigration5To6, AppDatabaseMigration6To7)
             .fallbackToDestructiveMigrationOnDowngrade(true)
             .build()
     }

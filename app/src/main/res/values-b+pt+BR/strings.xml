@@ -1546,4 +1546,7 @@ Abra as Configurações de Modelo para verificar a chave de API, a URL base, o n
     <string name="gif_capture_frames">"Quadros a amostrar (1-6)"</string>
     <string name="gif_capture_min_delay">"Atraso mínimo do quadro em ms (20-1000)"</string>
     <string name="poke_actions_global_subtitle">"Usado por todas as conversas individuais. %1$d ações configuradas."</string>
+    <string name="poke_actions_session_own">"Somente neste chat"</string>
+    <string name="poke_actions_session_inherit">"Seguindo os padrões globais"</string>
+    <string name="poke_actions_follow_global">"Voltar aos padrões globais"</string>
 </resources>

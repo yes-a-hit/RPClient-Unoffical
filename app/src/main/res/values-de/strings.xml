@@ -1542,4 +1542,7 @@
     <string name="gif_capture_frames">"Anzahl Einzelbilder (1-6)"</string>
     <string name="gif_capture_min_delay">"Minimale Bildverzögerung in ms (20-1000)"</string>
     <string name="poke_actions_global_subtitle">"Gilt für alle Einzelchats. %1$d Aktionen eingerichtet."</string>
+    <string name="poke_actions_session_own">"Nur in diesem Chat"</string>
+    <string name="poke_actions_session_inherit">"Folgt den globalen Vorgaben"</string>
+    <string name="poke_actions_follow_global">"Globale Vorgaben übernehmen"</string>
 </resources>
