@@ -329,6 +329,11 @@ private fun GroupChatNormalView(
                 enabled = !generating,
                 onSelect = { emitIntent(GroupChatUiIntent.SwitchScene(it)) }
             )
+            SceneEffectBanner(
+                scenes = state.scenes,
+                activeSceneId = state.activeSceneId,
+                members = state.members
+            )
             MemberRail(
                 members = state.members,
                 selectedSpeakerId = state.conversationState.selectedSpeakerId,
@@ -1213,9 +1218,66 @@ private fun SceneRail(
     }
 }
 
+/**
+ * 当前场景的生效提示。
+ *
+ * 切换场景以前是「静悄悄换了批设定」——用户看不出到底谁被禁言、哪些设定被收起，
+ * 于是以为功能没生效。这里把后果直接摊开：谁在场、谁不在场、带了几条设定。
+ * 没有场景或场景不限制任何东西时整条不出现，不占版面。
+ */
 @Composable
-private fun MemberRail(
-    members: List<GroupChatMemberItem>,
+private fun SceneEffectBanner(
+    scenes: List<GroupChatSceneItem>,
+    activeSceneId: String,
+    members: List<GroupChatMemberItem>
+) {
+    val scene = scenes.firstOrNull { it.id == activeSceneId } ?: return
+    if (!scene.restrictMembers && scene.lorebookEntryCount == 0) return
+    val present = members.filter { it.inScene }.map { it.name }
+    val absent = members.filterNot { it.inScene }.map { it.name }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.Place,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+                tint = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Text(
+                text = "场景「" + scene.name + "」",
+                modifier = Modifier.padding(start = 6.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+        }
+        if (scene.restrictMembers) {
+            Text(
+                text = "在场：" + (present.joinToString("、").ifBlank { "无" }) +
+                    if (absent.isNotEmpty()) "　已闭麦：" + absent.joinToString("、") else "",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+        }
+        if (scene.lorebookEntryCount > 0) {
+            Text(
+                text = "世界书：本场只用勾选的 " + scene.lorebookEntryCount + " 条，其余暂时收起",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemberRail(    members: List<GroupChatMemberItem>,
     selectedSpeakerId: Long?,
     enabled: Boolean,
     onSelect: (Long) -> Unit,
@@ -1256,10 +1318,16 @@ private fun MemberChip(
     Card(
         modifier = Modifier
             .width(138.dp)
-            .alpha(if (member.muted) 0.55f else 1f)
-            // 短按选中发言人，长按戳一戳
+            .alpha(
+                when {
+                    !member.inScene -> 0.42f
+                    member.muted -> 0.55f
+                    else -> 1f
+                }
+            )
+            // 短按选中发言人，长按戳一戳；不在场的人这一场点不动
             .combinedClickable(
-                enabled = enabled,
+                enabled = enabled && member.inScene,
                 onLongClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                     // 长按用的是预设列表里的第一个动作（默认「戳一戳」）；
@@ -1299,21 +1367,33 @@ private fun MemberChip(
                 modifier = Modifier.size(38.dp),
                 image = member.avatarImage
             )
-            Text(
-                text = member.name,
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 8.dp),
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                    .padding(start = 8.dp)
+            ) {
+                Text(
+                    text = member.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                // 不在场要写明，别只靠变灰——灰了看起来像禁言
+                if (!member.inScene) {
+                    Text(
+                        text = "不在场",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                        maxLines = 1
+                    )
+                }
+            }
             IconButton(
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                     onToggleMuted()
                 },
-                enabled = enabled,
+                enabled = enabled && member.inScene,
                 modifier = Modifier.size(28.dp)
             ) {
                 Icon(
@@ -2349,6 +2429,7 @@ private fun DialogSwitch(
         is GroupChatDialogState.SceneEditor -> SceneEditorDialog(
             dialogState = dialogState,
             members = state.members,
+            lorebookGroups = state.settingsState.lorebookGroups,
             emitIntent = emitIntent
         )
     }
@@ -2364,6 +2445,7 @@ private fun DialogSwitch(
 private fun SceneEditorDialog(
     dialogState: GroupChatDialogState.SceneEditor,
     members: List<GroupChatMemberItem>,
+    lorebookGroups: List<GroupChatLorebookGroupItem>,
     emitIntent: (GroupChatUiIntent) -> Unit
 ) {
     AppDialogScaffold(
@@ -2412,6 +2494,40 @@ private fun SceneEditorDialog(
                         },
                         label = { Text(member.name) }
                     )
+                }
+            }
+            // 世界书：勾了就只剩这几条生效，一条不勾表示这一场不做限制
+            if (lorebookGroups.isNotEmpty()) {
+                Text(
+                    text = "本场世界书（一条不勾表示不限制）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                lorebookGroups.forEach { group ->
+                    Text(
+                        text = group.lorebookName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        group.entries.forEach { entry ->
+                            FilterChip(
+                                selected = dialogState.lorebookEntryIds.contains(entry.id),
+                                onClick = {
+                                    emitIntent(
+                                        GroupChatUiIntent.ToggleSceneEditorLorebookEntry(entry.id)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = entry.name.ifBlank { "条目 " + entry.id },
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            )
+                        }
+                    }
                 }
             }
             if (dialogState.sceneId != null) {

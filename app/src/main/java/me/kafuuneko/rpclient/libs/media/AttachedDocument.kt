@@ -25,16 +25,12 @@ data class AttachedDocument(
     /**
      * 拼进消息体的样子。
      *
-     * 正文仍然夹在消息里——这是「用户把一份文件递过来」最直白的表达，
-     * 模型看得见、历史存得下、导出备份也带得走。界面上由
-     * `MessageDocumentBlock` 认这两个标记，把它收成一张可展开的卡片，
-     * 所以不会把气泡顶穿。
+     * 只放一个引用，正文已经在 [DocumentStore] 里躺着。理由有三条：
+     * 气泡里换成一行文件条，不会把对话顶穿；消息表不会被几万字撑大；
+     * 用户在输入区按 × 撤掉附件时，那份文件仍然留在库里，
+     * 之后还能被引用、被导出——撤掉的是「这一次要发的东西」，不是文件本身。
      */
-    fun renderForMessage(): String = buildString {
-        append("[文件：").append(name).append("]\n")
-        append(text)
-        append("\n[/文件]")
-    }
+    fun renderForMessage(): String = "[文件：" + name + "#" + id + "]"
 }
 
 /** 从正文里认出的一个文档引用。 */

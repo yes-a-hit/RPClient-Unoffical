@@ -1137,6 +1137,12 @@ class GroupChatViewModel :
             )
             // 执行用户输入端 Source 正则
             val attachments = uiState.conversationState.attachedDocuments
+            // 附件进了发送流程就从输入区摘掉，避免下一次又被拼一遍
+            if (attachments.isNotEmpty()) {
+                uiState.copy(
+                    conversationState = uiState.conversationState.copy(attachedDocuments = emptyList())
+                ).setup()
+            }
             // 文档正文只拼在落库的消息上，不参与场景指令解析与发言者选择——
             // 那两步看的是「用户说了什么」，不是「文件里写了什么」。
             val input = applyUserRegex(initialData, rawInput) +
@@ -2055,7 +2061,8 @@ class GroupChatViewModel :
                 sceneId = target?.id,
                 name = target?.name.orEmpty(),
                 memberIds = target?.characterIds?.toSet().orEmpty(),
-                description = target?.description.orEmpty()
+                description = target?.description.orEmpty(),
+                lorebookEntryIds = target?.lorebookEntryIds?.toSet().orEmpty()
             )
         ).setup()
     }
@@ -2081,6 +2088,17 @@ class GroupChatViewModel :
         }
     }
 
+    @UiIntentObserver(GroupChatUiIntent.ToggleSceneEditorLorebookEntry::class)
+    private fun onToggleSceneEditorLorebookEntry(
+        intent: GroupChatUiIntent.ToggleSceneEditorLorebookEntry
+    ) {
+        updateSceneEditor { editor ->
+            val next = editor.lorebookEntryIds.toMutableSet()
+            if (!next.add(intent.entryId)) next.remove(intent.entryId)
+            editor.copy(lorebookEntryIds = next)
+        }
+    }
+
     private fun updateSceneEditor(transform: (GroupChatDialogState.SceneEditor) -> GroupChatDialogState.SceneEditor) {
         val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
         val editor = uiState.dialogState as? GroupChatDialogState.SceneEditor ?: return
@@ -2102,7 +2120,8 @@ class GroupChatViewModel :
             id = editor.sceneId ?: UUID.randomUUID().toString(),
             name = name,
             description = editor.description.trim(),
-            characterIds = editor.memberIds.toList()
+            characterIds = editor.memberIds.toList(),
+            lorebookEntryIds = editor.lorebookEntryIds.toList()
         )
         val updated = if (editor.sceneId == null) {
             existing + scene
@@ -2694,23 +2713,37 @@ class GroupChatViewModel :
         speaker: GroupChatMemberData
     ): GroupLorebookContext {
         // 提取会话勾选的条目 ID
-        val selectedEntryIds = mGroupChatRepository
+        val sessionEntryIds = mGroupChatRepository
             .getSessionLorebookEntryIds(data.session)
             .toSet()
+        // 场景勾了条目就以场景为准：进厨房只带厨房的设定，客厅那套先收起来
+        val activeScene = GroupChatScenes.active(
+            GroupChatScenes.decode(data.session.scenesJson),
+            data.session.activeSceneId
+        )
+        val selectedEntryIds = GroupChatScenes
+            .effectiveLorebookEntryIds(activeScene, sessionEntryIds)
         // 根据角色卡模式确定参与世界书匹配的成员集合
+        val allowedCharacterIds = GroupChatScenes.allowedCharacterIds(activeScene)
         val cardMembers = if (
             data.session.characterCardMode == GroupChatSession.CharacterCardMode.Join
         ) {
             data.members.filter {
-                data.session.includeMutedCards || !it.relation.muted
+                (data.session.includeMutedCards || !it.relation.muted) &&
+                    (allowedCharacterIds == null || it.character.id in allowedCharacterIds)
             }
         } else {
             listOf(speaker)
         }
-        val characterLorebookIds = cardMembers
-            .map { it.character.characterLorebookId }
-            .filter { it > 0L }
-            .toSet()
+        // 场景限定了条目时，角色卡自带的世界书也要让位，否则等于没关
+        val characterLorebookIds = if (activeScene?.restrictsLorebook == true) {
+            emptySet()
+        } else {
+            cardMembers
+                .map { it.character.characterLorebookId }
+                .filter { it > 0L }
+                .toSet()
+        }
         // 批量读取全部世界书及条目，再过滤当前会话需要的资源。
         val lorebooksWithEntries = mLorebookRepository.getAllLorebooksWithEntries()
         val lorebooks = lorebooksWithEntries.map { it.lorebook }
@@ -2825,6 +2858,12 @@ class GroupChatViewModel :
         for (member in data.members) {
             avatarByCharacterId[member.character.id] = loadAvatarImage(member.character.avatar)
         }
+        // 当前场景决定谁在场：不在场的角色自动闭麦，界面上也要看得出来
+        val activeSceneForList = GroupChatScenes.active(
+            GroupChatScenes.decode(data.session.scenesJson),
+            data.session.activeSceneId
+        )
+        val allowedIds = GroupChatScenes.allowedCharacterIds(activeSceneForList)
         val members = data.members.map {
             GroupChatMemberItem(
                 id = it.character.id,
@@ -2835,19 +2874,22 @@ class GroupChatViewModel :
                     userName = data.session.userName
                 ),
                 muted = it.relation.muted,
+                inScene = allowedIds == null || it.character.id in allowedIds,
                 avatarImage = avatarByCharacterId[it.character.id]
             )
         }
-        // 计算当前激活策略下的有效选中发言人
+        // 计算当前激活策略下的有效选中发言人；不在场的人先排掉，
+        // 否则自动策略会把话筒递给一个「这一场根本不在」的角色
+        val speakable = members.filter { !it.muted && it.inScene }
         val validSelectedSpeakerId = selectedSpeakerId
-            ?.takeIf { id -> members.any { it.id == id && !it.muted } }
+            ?.takeIf { id -> speakable.any { it.id == id } }
         val effectiveSpeakerId = if (
             data.session.activationStrategy ==
             GroupChatSession.ActivationStrategy.Manual
         ) {
             validSelectedSpeakerId
         } else {
-            validSelectedSpeakerId ?: members.firstOrNull { !it.muted }?.id
+            validSelectedSpeakerId ?: speakable.firstOrNull()?.id
         }
         // 组装可用添加角色列表
         val memberIds = members.map { it.id }.toSet()
@@ -2896,7 +2938,8 @@ class GroupChatViewModel :
                 id = scene.id,
                 name = scene.name,
                 memberNames = scene.characterIds.mapNotNull { nameById[it] },
-                restrictMembers = scene.restrictsMembers
+                restrictMembers = scene.restrictsMembers,
+                lorebookEntryIds = scene.lorebookEntryIds
             )
         }
         // 构建并返回群聊完整 UI 状态

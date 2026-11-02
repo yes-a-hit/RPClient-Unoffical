@@ -83,10 +83,18 @@ class DocumentStore(private val mContext: Context) {
         /** 单份文件送进提示词的默认上限；再长就该分段读了。 */
         const val DEFAULT_PROMPT_BUDGET = 12_000
 
-        /** 新文档的 id：时间戳加随机后缀，够用且不会撞。 */
+        /**
+         * 新文档的 id。
+         *
+         * 时间戳只到毫秒，一次粘十份文件时十份全落在同一毫秒里，
+         * 靠 16 位随机数区分——两百次抽取撞上的概率是四分之一，实测就撞了。
+         * 这里补一个进程内自增序号，同一毫秒内也绝不重复。
+         */
+        private val sequence = java.util.concurrent.atomic.AtomicLong()
+
         fun newId(): String =
             "doc" + System.currentTimeMillis().toString(36) +
-                Integer.toHexString((Math.random() * 0xFFFF).toInt())
+                "-" + sequence.incrementAndGet().toString(36)
     }
 }
 

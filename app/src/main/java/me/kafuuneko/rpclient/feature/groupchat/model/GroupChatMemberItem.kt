@@ -12,6 +12,13 @@ data class GroupChatMemberItem(
     val description: String,
     /** 当前群聊成员是否被禁言。 */
     val muted: Boolean,
+    /**
+     * 是否在当前场景的场子里。
+     *
+     * 和 [muted] 分开：禁言是「人在场但不出声」，不在场是「人压根在别处」。
+     * 两者在提示词里该说的话不一样，界面上也不该长得一样。
+     */
+    val inScene: Boolean = true,
     /** 已解码的角色头像；为空时界面回退为名称首字头像。 */
     val avatarImage: ImageBitmap? = null
 )

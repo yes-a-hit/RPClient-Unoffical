@@ -297,7 +297,8 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             return
         }
         android.util.Log.d("ChatDoc", "附加文件 " + read.size + " 份：" + read.joinToString { it.name + "(" + it.charCount + "字)" })
-        // 正文随消息走，不再另存一份：气泡里由卡片收起，备份也带得走
+        // 正文先落盘，消息体里只留引用：气泡干净，撤掉附件时文件也还在库里
+        withContext(Dispatchers.IO) { read.forEach { mDocumentStore.save(it) } }
         uiState.copy(
             conversationState = uiState.conversationState.copy(
                 attachedDocuments = uiState.conversationState.attachedDocuments + read
@@ -724,6 +725,14 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         if (mImageCoordinator.state.processing) return
         val images = mImageCoordinator.draftInputs()
         val attachments = uiState.conversationState.attachedDocuments
+        // 附件一旦进了发送流程就从输入区摘下来：留在那里既占地方，
+        // 又会在下一次发送时被重复拼进消息。发送失败也不恢复——
+        // 失败的是这次请求，不是用户手里的文件。
+        if (attachments.isNotEmpty()) {
+            uiState.copy(
+                conversationState = uiState.conversationState.copy(attachedDocuments = emptyList())
+            ).setup()
+        }
         // 文档附件的正文只在这一步拼进来：输入框保持干净，消息里保留完整内容。
         val rawInput = (
             uiState.conversationState.inputDraft.trim()

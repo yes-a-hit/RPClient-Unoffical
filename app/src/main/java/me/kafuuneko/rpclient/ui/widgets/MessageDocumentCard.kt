@@ -56,11 +56,16 @@ fun MessageDocumentCard(
     var expanded by remember(name) { mutableStateOf(false) }
     // 新消息的正文不在消息体里，展开时才去仓库取；旧消息直接就有
     var loaded by remember(documentId) { mutableStateOf(body) }
-    val store = remember { org.koin.core.context.GlobalContext.get()
-        .get<me.kafuuneko.rpclient.libs.media.DocumentStore>() }
+    // 取仓库失败不能让整个气泡炸掉——那会表现为「这条消息什么都不显示」
+    val store = remember {
+        runCatching {
+            org.koin.core.context.GlobalContext.get()
+                .get<me.kafuuneko.rpclient.libs.media.DocumentStore>()
+        }.getOrNull()
+    }
     LaunchedEffect(expanded, documentId) {
         if (!expanded || loaded != null || documentId.isBlank()) return@LaunchedEffect
-        loaded = withContext(Dispatchers.IO) { store.load(documentId)?.text }
+        loaded = withContext(Dispatchers.IO) { runCatching { store?.load(documentId)?.text }.getOrNull() }
     }
     val charCount = loaded?.length ?: 0
     val container = if (isUser) {
@@ -97,8 +102,12 @@ fun MessageDocumentCard(
                         overflow = TextOverflow.MiddleEllipsis
                     )
                     Text(
-                        text = if (loaded == null) "已附带" + if (expanded) " · 读取中" else " · 点击展开"
-                        else "$charCount 字" + if (expanded) " · 已展开" else " · 点击展开",
+                        text = when {
+                            loaded != null -> "$charCount 字" + if (expanded) " · 已展开" else " · 点击展开"
+                            documentId.isBlank() -> "内容未随消息保存"
+                            expanded -> "读取中…"
+                            else -> "已附带" + " · 点击展开"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = onContainer.copy(alpha = 0.7f)
                     )

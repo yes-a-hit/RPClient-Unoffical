@@ -196,7 +196,15 @@ sealed class GroupChatDialogState {
         val sceneId: String? = null,
         val name: String = "",
         val memberIds: Set<Long> = emptySet(),
-        val description: String = ""
+        val description: String = "",
+        /**
+         * 本场只启用这些世界书条目。
+         *
+         * 空集合同样不是「一条都不用」，而是「这一场不做限制」——
+         * 与 [memberIds] 的约定保持一致，否则一个没配过的场景
+         * 会顺手把整本书关掉。
+         */
+        val lorebookEntryIds: Set<Long> = emptySet()
     ) : GroupChatDialogState()
 }
 

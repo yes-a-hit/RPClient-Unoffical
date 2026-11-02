@@ -148,6 +148,9 @@ sealed class GroupChatUiIntent {
 
     /** 切换某个角色是否驻扎在该场景；空集合代表全员在场。 */
     data class ToggleSceneEditorMember(val characterId: Long) : GroupChatUiIntent()
+
+    /** 切换某条世界书条目是否属于本场；空集合代表不限制。 */
+    data class ToggleSceneEditorLorebookEntry(val entryId: Long) : GroupChatUiIntent()
     data object SaveSceneEditor : GroupChatUiIntent()
     data class DeleteScene(val sceneId: String) : GroupChatUiIntent()
 

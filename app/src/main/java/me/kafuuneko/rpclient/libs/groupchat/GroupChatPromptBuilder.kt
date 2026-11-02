@@ -843,13 +843,27 @@ class GroupChatPromptBuilder(
             builder.append('\n').append(scene.description.trim())
         }
         if (scene.restrictsMembers) {
-            val presentNames = presentMembers().joinToString("、") { it.character.name }
+            val present = presentMembers()
+            val presentNames = present.joinToString("、") { it.character.name }
             if (presentNames.isNotBlank()) {
                 builder.append("\n【本场在场】").append(presentNames)
-                builder.append("\n只有在场角色可以发言和行动，其余成员此时不在这一场，不得替他们说话或描写他们的反应。")
             } else {
                 builder.append("\n【本场无人】配置的在场角色都不在群成员里，本场只能描写环境。")
             }
+            // 点名缺席的人，比只说「其余成员不在」更能压住模型顺嘴提人
+            val absentNames = members
+                .filter { member -> present.none { it.character.id == member.character.id } }
+                .joinToString("、") { it.character.name }
+            if (absentNames.isNotBlank()) {
+                builder.append("\n【不在这一场】").append(absentNames)
+                builder.append(
+                    "\n这些角色此刻在别处，听不到这里的话，也不可能插话、" +
+                        "不会出现在这一场的描写里。不要替他们说话，也不要写他们的反应。"
+                )
+            }
+        }
+        if (scene.restrictsLorebook) {
+            builder.append("\n【本场设定】只使用与本场相关的设定条目，其他地点的设定此时不适用。")
         }
         if (scene.entryPrompt.isNotBlank()) {
             builder.append('\n').append(scene.entryPrompt.trim())

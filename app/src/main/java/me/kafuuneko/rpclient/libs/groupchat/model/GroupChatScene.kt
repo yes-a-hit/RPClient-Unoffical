@@ -18,11 +18,22 @@ data class GroupChatScene(
     /** 驻扎在本场的角色 ID；空列表等于所有人。 */
     val characterIds: List<Long> = emptyList(),
     /** 进入场景时追加的一条旁白提示，可为空。 */
-    val entryPrompt: String = ""
+    val entryPrompt: String = "",
+    /**
+     * 本场只用这些世界书条目；空列表等于不干预，沿用会话已启用的那批。
+     *
+     * 和 [characterIds] 一样是「收窄」而不是「替换」：配了才生效，
+     * 没配过的旧场景一个字节都不用改，行为跟以前一模一样。
+     */
+    val lorebookEntryIds: List<Long> = emptyList()
 ) {
     /** 本场是否限定了具体成员。 */
     val restrictsMembers: Boolean
         get() = characterIds.isNotEmpty()
+
+    /** 本场是否限定了世界书条目。 */
+    val restrictsLorebook: Boolean
+        get() = lorebookEntryIds.isNotEmpty()
 }
 
 /**

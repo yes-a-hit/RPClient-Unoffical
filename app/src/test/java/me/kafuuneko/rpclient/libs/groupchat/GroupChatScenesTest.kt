@@ -129,4 +129,53 @@ class GroupChatScenesTest {
         // 同样的输入应得到同样的 id，否则每次读库都变
         assertEquals(scenes[0].id, GroupChatScenes.decode(json)[0].id)
     }
+
+    @Test
+    fun `场景没勾世界书条目不限制`() {
+        val scene = GroupChatScene(id = "a", name = "厨房")
+        assertNull(GroupChatScenes.allowedLorebookEntryIds(scene))
+        assertEquals(
+            setOf(1L, 2L, 3L),
+            GroupChatScenes.effectiveLorebookEntryIds(scene, setOf(1L, 2L, 3L))
+        )
+    }
+
+    @Test
+    fun `场景勾了世界书条目就以场景为准`() {
+        // 进厨房只该带厨房的设定，客厅那套先收起来——覆盖而不是取交集
+        val scene = GroupChatScene(id = "a", name = "厨房", lorebookEntryIds = listOf(7L, 8L))
+        assertEquals(setOf(7L, 8L), GroupChatScenes.allowedLorebookEntryIds(scene))
+        assertEquals(
+            setOf(7L, 8L),
+            GroupChatScenes.effectiveLorebookEntryIds(scene, setOf(1L, 2L, 3L))
+        )
+        assertTrue(scene.restrictsLorebook)
+    }
+
+    @Test
+    fun `没有激活场景时沿用会话勾选`() {
+        assertNull(GroupChatScenes.allowedLorebookEntryIds(null))
+        assertEquals(
+            setOf(1L),
+            GroupChatScenes.effectiveLorebookEntryIds(null, setOf(1L))
+        )
+    }
+
+    @Test
+    fun `世界书条目往返不丢`() {
+        val scenes = listOf(
+            GroupChatScene(id = "a", name = "厨房", lorebookEntryIds = listOf(9L, 10L))
+        )
+        val restored = GroupChatScenes.decode(GroupChatScenes.encode(scenes))
+        assertEquals(listOf(9L, 10L), restored[0].lorebookEntryIds)
+    }
+
+    @Test
+    fun `旧数据没有世界书字段时落到空列表`() {
+        // 加了字段之后，之前存下来的场景 JSON 里根本没有这个键
+        val json = """[{"id":"a","name":"客厅","characterIds":[1]}]"""
+        val scene = GroupChatScenes.decode(json).single()
+        assertTrue(scene.lorebookEntryIds.isEmpty())
+        assertTrue(!scene.restrictsLorebook)
+    }
 }

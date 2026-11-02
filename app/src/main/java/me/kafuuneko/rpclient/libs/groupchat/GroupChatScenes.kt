@@ -71,6 +71,34 @@ object GroupChatScenes {
     }
 
     /**
+     * 本场只启用哪些世界书条目。
+     *
+     * 返回 null 表示「不做限制」，沿用会话原本勾选的那批；
+     * 返回集合表示只认这些。和 [allowedCharacterIds] 同一个约定，
+     * 让调用方能区分「场景没限制」和「场景恰好包含了全部条目」。
+     */
+    fun allowedLorebookEntryIds(scene: GroupChatScene?): Set<Long>? {
+        if (scene == null) return null
+        if (!scene.restrictsLorebook) return null
+        return scene.lorebookEntryIds.toSet()
+    }
+
+    /**
+     * 当前场景下真正生效的世界书条目。
+     *
+     * 场景勾了就是覆盖，不是取交集：用户给「厨房」勾了两条炖汤的设定，
+     * 进厨房时就该只有这两条在起作用，原先勾的十条先让位。
+     * 场景一条都没勾，说明这一场不需要特别限制，原样沿用会话的设置。
+     */
+    fun effectiveLorebookEntryIds(
+        scene: GroupChatScene?,
+        sessionEntryIds: Set<Long>
+    ): Set<Long> {
+        val allowed = allowedLorebookEntryIds(scene) ?: return sessionEntryIds
+        return allowed
+    }
+
+    /**
      * 解析一条用户输入是否为场景指令。
      *
      * 只认行首前缀：正文里出现「/去 厨房」不该被劫持，
@@ -92,10 +120,15 @@ object GroupChatScenes {
     }
 
     /** 生成一个新场景，id 用时间戳加名字哈希，避免同一毫秒撞车。 */
-    fun newScene(name: String, characterIds: List<Long> = emptyList()): GroupChatScene =
+    fun newScene(
+        name: String,
+        characterIds: List<Long> = emptyList(),
+        lorebookEntryIds: List<Long> = emptyList()
+    ): GroupChatScene =
         GroupChatScene(
             id = "scene-" + System.currentTimeMillis() + "-" + name.hashCode(),
             name = name.trim(),
-            characterIds = characterIds
+            characterIds = characterIds,
+            lorebookEntryIds = lorebookEntryIds
         )
 }
