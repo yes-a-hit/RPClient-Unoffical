@@ -134,6 +134,7 @@ import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatUiIntent
 import me.kafuuneko.rpclient.feature.groupchat.presentation.GroupChatUiState
 import me.kafuuneko.rpclient.libs.AppModel
 import me.kafuuneko.rpclient.libs.core.ActivityPreview
+import me.kafuuneko.rpclient.libs.poke.PokeAction
 import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatActivationStrategy
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatCharacterCardMode
@@ -188,6 +189,12 @@ fun GroupChatLayout(
                     onConfirm = { picked ->
                         emitIntent(GroupChatUiIntent.AttachGalleryImages(picked.map { it.fileUuid }))
                     }
+                )
+            }
+            if (uiState.settingsState.pokeActionEditorVisible) {
+                PokeActionEditorDialog(
+                    drafts = uiState.settingsState.pokeActionDrafts,
+                    emitIntent = emitIntent
                 )
             }
             LoadStateOverlay(uiState.loadState)
@@ -674,6 +681,29 @@ private fun GroupChatSettingsView(
                         icon = Icons.Rounded.Add,
                         title = stringResource(R.string.group_chat_scene_add),
                         onClick = { emitIntent(GroupChatUiIntent.OpenSceneEditor(null)) }
+                    )
+                }
+            }
+            item {
+                GroupSettingsSection(title = stringResource(R.string.poke_actions_title)) {
+                    Text(
+                        text = stringResource(R.string.poke_actions_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val actions = state.pokeActions.ifEmpty { PokeActions.DEFAULTS }
+                    actions.forEach { action ->
+                        SettingsActionRow(
+                            icon = Icons.Rounded.TouchApp,
+                            title = action.label,
+                            subtitle = action.template,
+                            onClick = { emitIntent(GroupChatUiIntent.OpenPokeActionEditor) }
+                        )
+                    }
+                    SettingsActionRow(
+                        icon = Icons.Rounded.Edit,
+                        title = stringResource(R.string.poke_actions_edit),
+                        onClick = { emitIntent(GroupChatUiIntent.OpenPokeActionEditor) }
                     )
                 }
             }
@@ -2405,6 +2435,91 @@ private fun SceneEditorDialog(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 动作预设的编辑框。
+ *
+ * 名字直接存显示文本，模板里用 `{name}` 占位——用户自己写的动作，
+ * 不该被语言包限制死。删到一条不剩时保存会被拦下，因为「+」菜单
+ * 里至少要有东西可点。
+ */
+@Composable
+private fun PokeActionEditorDialog(
+    drafts: List<PokeAction>,
+    emitIntent: (GroupChatUiIntent) -> Unit
+) {
+    AppDialogScaffold(
+        onDismissRequest = { emitIntent(GroupChatUiIntent.ClosePokeActionEditor) },
+        title = stringResource(R.string.poke_actions_title),
+        confirmText = stringResource(R.string.poke_actions_save),
+        confirmEnabled = drafts.any { it.label.isNotBlank() || it.template.isNotBlank() },
+        onConfirm = { emitIntent(GroupChatUiIntent.SavePokeActions) },
+        scrollableContent = true
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.poke_actions_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            drafts.forEach { action ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = action.label,
+                            onValueChange = {
+                                emitIntent(
+                                    GroupChatUiIntent.ChangePokeAction(
+                                        action.id, it, action.template
+                                    )
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.poke_actions_label)) },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = action.template,
+                            onValueChange = {
+                                emitIntent(
+                                    GroupChatUiIntent.ChangePokeAction(
+                                        action.id, action.label, it
+                                    )
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.poke_actions_template)) },
+                            minLines = 1,
+                            maxLines = 3
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            emitIntent(GroupChatUiIntent.RemovePokeAction(action.id))
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = stringResource(R.string.delete),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+            TextButton(onClick = { emitIntent(GroupChatUiIntent.AddPokeAction) }) {
+                Icon(Icons.Rounded.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(stringResource(R.string.poke_actions_add))
             }
         }
     }

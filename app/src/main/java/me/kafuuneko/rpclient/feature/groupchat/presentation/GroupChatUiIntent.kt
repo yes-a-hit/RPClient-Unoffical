@@ -50,6 +50,28 @@ sealed class GroupChatUiIntent {
 
     /** 对某个成员做一个动作；长按头像触发，或从「+」菜单里选动作。 */
     data class PokeMember(val memberName: String, val actionId: String = "") : GroupChatUiIntent()
+
+    /** 打开动作预设编辑框。 */
+    data object OpenPokeActionEditor : GroupChatUiIntent()
+
+    /** 关闭动作预设编辑框，丢弃草稿。 */
+    data object ClosePokeActionEditor : GroupChatUiIntent()
+
+    /** 改一条动作草稿的名字与模板；id 是稳定标识，不会变。 */
+    data class ChangePokeAction(
+        val id: String,
+        val label: String,
+        val template: String
+    ) : GroupChatUiIntent()
+
+    /** 草稿里追加一条新动作。 */
+    data object AddPokeAction : GroupChatUiIntent()
+
+    /** 从草稿里删掉一条动作。 */
+    data class RemovePokeAction(val id: String) : GroupChatUiIntent()
+
+    /** 把草稿写回全局设置。 */
+    data object SavePokeActions : GroupChatUiIntent()
     data object StopGeneration : GroupChatUiIntent()
     data object SummarizeNow : GroupChatUiIntent()
     data object RestorePreviousSummary : GroupChatUiIntent()

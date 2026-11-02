@@ -1528,4 +1528,12 @@ Abra as Configurações de Modelo para verificar a chave de API, a URL base, o n
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">Escolher da galeria</string>
+    <string name="poke_actions_title">Ações</string>
+    <string name="poke_actions_subtitle">Predefinições no menu + e ao pressionar. {name} é substituído pelo alvo.</string>
+    <string name="poke_actions_edit">Editar ações</string>
+    <string name="poke_actions_add">Adicionar ação</string>
+    <string name="poke_actions_label">Nome</string>
+    <string name="poke_actions_template">Modelo</string>
+    <string name="poke_actions_need_one">Mantenha ao menos uma ação</string>
+    <string name="poke_actions_save">Salvar</string>
 </resources>

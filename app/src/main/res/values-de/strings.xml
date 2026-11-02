@@ -1524,4 +1524,12 @@
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">Aus Galerie wählen</string>
+    <string name="poke_actions_title">Aktionen</string>
+    <string name="poke_actions_subtitle">Voreinstellungen im +-Menü und beim Langdrücken. {name} wird ersetzt.</string>
+    <string name="poke_actions_edit">Aktionen bearbeiten</string>
+    <string name="poke_actions_add">Aktion hinzufügen</string>
+    <string name="poke_actions_label">Name</string>
+    <string name="poke_actions_template">Vorlage</string>
+    <string name="poke_actions_need_one">Mindestens eine Aktion behalten</string>
+    <string name="poke_actions_save">Speichern</string>
 </resources>

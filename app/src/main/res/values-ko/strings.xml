@@ -1519,4 +1519,12 @@
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">라이브러리에서 선택</string>
+    <string name="poke_actions_title">동작</string>
+    <string name="poke_actions_subtitle">+ 메뉴와 길게 누르기에 쓰이는 프리셋. {name}은 대상 이름으로 바뀝니다.</string>
+    <string name="poke_actions_edit">동작 편집</string>
+    <string name="poke_actions_add">동작 추가</string>
+    <string name="poke_actions_label">이름</string>
+    <string name="poke_actions_template">템플릿</string>
+    <string name="poke_actions_need_one">동작을 하나 이상 남겨 두세요</string>
+    <string name="poke_actions_save">저장</string>
 </resources>

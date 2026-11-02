@@ -1529,4 +1529,12 @@
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">Выбрать из галереи</string>
+    <string name="poke_actions_title">Действия</string>
+    <string name="poke_actions_subtitle">Пресеты в меню + и при долгом нажатии. {name} заменяется на имя цели.</string>
+    <string name="poke_actions_edit">Изменить действия</string>
+    <string name="poke_actions_add">Добавить действие</string>
+    <string name="poke_actions_label">Название</string>
+    <string name="poke_actions_template">Шаблон</string>
+    <string name="poke_actions_need_one">Оставьте хотя бы одно действие</string>
+    <string name="poke_actions_save">Сохранить</string>
 </resources>

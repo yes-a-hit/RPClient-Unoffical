@@ -1525,4 +1525,12 @@ Mở Cài đặt mô hình để kiểm tra khóa API, URL cơ sở, tên mô h�
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">Chọn từ thư viện</string>
+    <string name="poke_actions_title">Hành động</string>
+    <string name="poke_actions_subtitle">Cài sẵn trong menu + và khi nhấn giữ. {name} được thay bằng tên đối tượng.</string>
+    <string name="poke_actions_edit">Sửa hành động</string>
+    <string name="poke_actions_add">Thêm hành động</string>
+    <string name="poke_actions_label">Tên</string>
+    <string name="poke_actions_template">Mẫu</string>
+    <string name="poke_actions_need_one">Giữ lại ít nhất một hành động</string>
+    <string name="poke_actions_save">Lưu</string>
 </resources>

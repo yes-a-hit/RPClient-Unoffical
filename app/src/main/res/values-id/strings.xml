@@ -1525,4 +1525,12 @@ Buka Pengaturan Model untuk memeriksa kunci API, URL dasar, nama model, dan izin
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">Pilih dari galeri</string>
+    <string name="poke_actions_title">Aksi</string>
+    <string name="poke_actions_subtitle">Preset di menu + dan saat tekan lama. {name} diganti dengan target.</string>
+    <string name="poke_actions_edit">Edit aksi</string>
+    <string name="poke_actions_add">Tambah aksi</string>
+    <string name="poke_actions_label">Nama</string>
+    <string name="poke_actions_template">Templat</string>
+    <string name="poke_actions_need_one">Sisakan setidaknya satu aksi</string>
+    <string name="poke_actions_save">Simpan</string>
 </resources>

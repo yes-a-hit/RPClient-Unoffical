@@ -1519,4 +1519,12 @@
     <string name="group_chat_scene_all_present">全员在场</string>
     <string name="group_chat_scene_nobody">还没有人</string>
     <string name="gallery_pick_from_library">从图库选</string>
+    <string name="poke_actions_title">动作</string>
+    <string name="poke_actions_subtitle">「+」菜单与长按时出现的预设；{name} 会替换成对象。</string>
+    <string name="poke_actions_edit">编辑动作</string>
+    <string name="poke_actions_add">添加动作</string>
+    <string name="poke_actions_label">名字</string>
+    <string name="poke_actions_template">模板</string>
+    <string name="poke_actions_need_one">至少要保留一个动作</string>
+    <string name="poke_actions_save">保存</string>
 </resources>

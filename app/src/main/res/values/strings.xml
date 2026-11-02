@@ -1577,4 +1577,12 @@
     <string name="group_chat_scene_all_present">全员在场</string>
     <string name="group_chat_scene_nobody">还没有人</string>
     <string name="gallery_pick_from_library">Pick from library</string>
+    <string name="poke_actions_title">Actions</string>
+    <string name="poke_actions_subtitle">Presets shown in the + menu and on long press. {name} is replaced with the target.</string>
+    <string name="poke_actions_edit">Edit actions</string>
+    <string name="poke_actions_add">Add action</string>
+    <string name="poke_actions_label">Name</string>
+    <string name="poke_actions_template">Template</string>
+    <string name="poke_actions_need_one">Keep at least one action</string>
+    <string name="poke_actions_save">Save</string>
 </resources>

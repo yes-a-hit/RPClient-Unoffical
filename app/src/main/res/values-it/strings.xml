@@ -1503,4 +1503,12 @@ Apri le impostazioni del modello per verificare la chiave API, l\'URL di base, i
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">Scegli dalla galleria</string>
+    <string name="poke_actions_title">Azioni</string>
+    <string name="poke_actions_subtitle">Preset nel menu + e alla pressione prolungata. {name} viene sostituito.</string>
+    <string name="poke_actions_edit">Modifica azioni</string>
+    <string name="poke_actions_add">Aggiungi azione</string>
+    <string name="poke_actions_label">Nome</string>
+    <string name="poke_actions_template">Modello</string>
+    <string name="poke_actions_need_one">"Mantieni almeno un'azione"</string>
+    <string name="poke_actions_save">Salva</string>
 </resources>

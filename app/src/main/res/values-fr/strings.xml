@@ -1525,4 +1525,12 @@
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">Choisir dans la galerie</string>
+    <string name="poke_actions_title">Actions</string>
+    <string name="poke_actions_subtitle">"Préréglages du menu + et de l'appui long. {name} est remplacé par la cible."</string>
+    <string name="poke_actions_edit">Modifier les actions</string>
+    <string name="poke_actions_add">Ajouter une action</string>
+    <string name="poke_actions_label">Nom</string>
+    <string name="poke_actions_template">Modèle</string>
+    <string name="poke_actions_need_one">Gardez au moins une action</string>
+    <string name="poke_actions_save">Enregistrer</string>
 </resources>

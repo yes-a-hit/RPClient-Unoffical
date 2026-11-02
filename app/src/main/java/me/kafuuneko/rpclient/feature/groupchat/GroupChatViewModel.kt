@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import me.kafuuneko.rpclient.feature.main.model.Route
 import me.kafuuneko.rpclient.R
 import me.kafuuneko.rpclient.feature.ModelSettingsGuideContent
+import me.kafuuneko.rpclient.libs.media.DocumentText
 import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.llm.replaceContentKeepingThink
 import me.kafuuneko.rpclient.libs.llm.stripThinkBlock
@@ -258,8 +259,19 @@ class GroupChatViewModel :
     @UiIntentObserver(GroupChatUiIntent.FilesPicked::class)
     private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {
         val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        // 文件选择器不限类型，用户可能顺手选了图；先分出来走图片，别当文本读
+        val images = intent.uris.filter { isImageUri(it) }
+        if (images.isNotEmpty()) mImageCoordinator.handle(MessageImageAction.Picked(images))
+        val documents = intent.uris.filterNot { isImageUri(it) }
+        if (documents.isEmpty()) return
         val chunks = withContext(Dispatchers.IO) {
-            intent.uris.mapNotNull { uri -> readTextFileContent(uri) }
+            documents.mapNotNull { uri ->
+                if (DocumentText.isDocx(displayNameOf(uri))) {
+                    DocumentText.readDocx(mContext.contentResolver, uri)
+                } else {
+                    readTextFileContent(uri)
+                }
+            }
         }
         if (chunks.isEmpty()) {
             AppViewEvent.PopupToastMessage(
@@ -273,6 +285,25 @@ class GroupChatViewModel :
             conversationState = uiState.conversationState.copy(inputDraft = merged)
         ).setup()
     }
+
+    /** 按 MIME 与扩展名双重判断，部分文件管理器的 getType 会返回空。 */
+    private fun isImageUri(uri: Uri): Boolean {
+        val mime = runCatching { mContext.contentResolver.getType(uri) }
+            .getOrNull().orEmpty().lowercase()
+        if (mime.startsWith("image/")) return true
+        val name = displayNameOf(uri)?.lowercase() ?: return false
+        return IMAGE_EXTENSIONS.any { name.endsWith(it) }
+    }
+
+    private fun displayNameOf(uri: Uri): String? = runCatching {
+        mContext.contentResolver.query(
+            uri,
+            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }.getOrNull() ?: uri.lastPathSegment
 
     /** 读取文本文件内容；二进制或空文件返回 null。 */
     private suspend fun readTextFileContent(uri: Uri): String? = withContext(Dispatchers.IO) {
@@ -949,6 +980,87 @@ class GroupChatViewModel :
         }
         if (mImageCoordinator.state.processing) return false
         return true
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.OpenPokeActionEditor::class)
+    private suspend fun onOpenPokeActionEditor() {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        uiState.updateSettings {
+            it.copy(
+                pokeActions = loadPokeActions(),
+                pokeActionDrafts = loadPokeActions(),
+                pokeActionEditorVisible = true
+            )
+        }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.ClosePokeActionEditor::class)
+    private suspend fun onClosePokeActionEditor() {
+        getOrNull<GroupChatUiState.Normal>()?.updateSettings {
+            it.copy(pokeActionEditorVisible = false, pokeActionDrafts = emptyList())
+        }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.ChangePokeAction::class)
+    private suspend fun onChangePokeAction(intent: GroupChatUiIntent.ChangePokeAction) {
+        getOrNull<GroupChatUiState.Normal>()?.updateSettings { settings ->
+            settings.copy(
+                pokeActionDrafts = settings.pokeActionDrafts.map { action ->
+                    if (action.id == intent.id) {
+                        action.copy(label = intent.label, template = intent.template)
+                    } else {
+                        action
+                    }
+                }
+            )
+        }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.AddPokeAction::class)
+    private suspend fun onAddPokeAction() {
+        getOrNull<GroupChatUiState.Normal>()?.updateSettings { settings ->
+            // id 只用于内部对应，用户看不到；用递增序号保证不和现有条目撞
+            val nextId = "custom_" + (settings.pokeActionDrafts.size + 1)
+            settings.copy(
+                pokeActionDrafts = settings.pokeActionDrafts +
+                    PokeAction(id = nextId, label = "", template = "（{name}）")
+            )
+        }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.RemovePokeAction::class)
+    private suspend fun onRemovePokeAction(intent: GroupChatUiIntent.RemovePokeAction) {
+        getOrNull<GroupChatUiState.Normal>()?.updateSettings { settings ->
+            settings.copy(
+                pokeActionDrafts = settings.pokeActionDrafts.filterNot { it.id == intent.id }
+            )
+        }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.SavePokeActions::class)
+    private suspend fun onSavePokeActions() {
+        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        val drafts = uiState.settingsState.pokeActionDrafts
+            .filter { it.label.isNotBlank() || it.template.isNotBlank() }
+        if (drafts.isEmpty()) {
+            AppViewEvent.PopupToastMessage(mContext.getString(R.string.poke_actions_need_one)).tryEmit()
+            return
+        }
+        AppModel.pokeActions = PokeActions.serialize(drafts)
+        uiState.updateSettings {
+            it.copy(
+                pokeActions = drafts,
+                pokeActionDrafts = emptyList(),
+                pokeActionEditorVisible = false
+            )
+        }
+    }
+
+    /** 设置子状态统一走这里改，避免每处都手写整树 copy。 */
+    private fun GroupChatUiState.Normal.updateSettings(
+        transform: (GroupChatSettingsState) -> GroupChatSettingsState
+    ) {
+        copy(settingsState = transform(settingsState)).setup()
     }
 
     @UiIntentObserver(GroupChatUiIntent.SendMessage::class)
@@ -3076,7 +3188,11 @@ class GroupChatViewModel :
     private companion object {
         /** 自动群聊模式下，两轮生成之间的短暂缓冲延时（毫秒）。 */
         const val AUTO_MODE_DELAY_MS = 500L
-    
+
+        /** 文件选择器不限类型，靠扩展名兜住 getType 返回空的图片。 */
+        val IMAGE_EXTENSIONS = listOf(
+            ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".heic", ".heif"
+        )
 
     /** 群聊页面首次和后续向前加载的单页消息数量。 */
         const val MESSAGE_PAGE_SIZE = 50

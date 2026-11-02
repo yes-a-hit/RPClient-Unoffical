@@ -1520,4 +1520,12 @@
     <string name="group_chat_scene_all_present">Everyone present</string>
     <string name="group_chat_scene_nobody">Nobody yet</string>
     <string name="gallery_pick_from_library">ライブラリから選ぶ</string>
+    <string name="poke_actions_title">アクション</string>
+    <string name="poke_actions_subtitle">＋メニューと長押しで使うプリセット。{name} は相手の名前に置き換わります。</string>
+    <string name="poke_actions_edit">アクションを編集</string>
+    <string name="poke_actions_add">アクションを追加</string>
+    <string name="poke_actions_label">名前</string>
+    <string name="poke_actions_template">テンプレート</string>
+    <string name="poke_actions_need_one">アクションを1つ以上残してください</string>
+    <string name="poke_actions_save">保存</string>
 </resources>

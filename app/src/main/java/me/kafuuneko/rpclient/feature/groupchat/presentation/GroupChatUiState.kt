@@ -139,6 +139,12 @@ data class GroupChatSettingsState(
     val availableCharacters: List<GroupChatAvailableCharacterItem> = emptyList(),
     /** 当前群聊已配置的场景，供设置页编辑。 */
     val scenes: List<GroupChatSceneItem> = emptyList(),
+    /** 已保存的动作预设，设置页展示用。 */
+    val pokeActions: List<me.kafuuneko.rpclient.libs.poke.PokeAction> = emptyList(),
+    /** 动作预设编辑框是否打开。 */
+    val pokeActionEditorVisible: Boolean = false,
+    /** 动作预设的未保存草稿；打开编辑框时从已保存内容拷一份。 */
+    val pokeActionDrafts: List<me.kafuuneko.rpclient.libs.poke.PokeAction> = emptyList(),
     /** 按世界书分组后的条目列表。 */
     val lorebookGroups: List<GroupChatLorebookGroupItem> = emptyList(),
     /** 按搜索条件过滤后实际展示的世界书分组。 */
