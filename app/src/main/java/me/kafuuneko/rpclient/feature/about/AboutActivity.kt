@@ -63,7 +63,7 @@ class AboutActivity : CoreActivity() {
                 developerEmail = AppModel.EMAIL,
                 githubIssuesUrl = "${AppModel.GITHUB_REPO}/issues",
                 forkRepoUrl = AppModel.UV_GITHUB_REPO,
-                forkRepoName = "yes-a-hit/RPClient",
+                forkRepoName = "yes-a-hit/RPClient-Unoffical",
                 forkEmail = AppModel.UV_EMAIL,
                 forkIssuesUrl = "${AppModel.UV_GITHUB_REPO}/issues"
             )

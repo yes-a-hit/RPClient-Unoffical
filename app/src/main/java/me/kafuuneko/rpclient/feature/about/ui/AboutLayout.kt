@@ -308,8 +308,8 @@ private fun AboutPreviewContent() {
             githubRepoUrl = "https://github.com/KafuuNeko/RPClient",
             githubRepoName = "KafuuNeko/RPClient",
             developerEmail = "kafuuneko@gmail.com",
-            forkRepoUrl = "https://github.com/yes-a-hit/RPClient",
-            forkRepoName = "yes-a-hit/RPClient",
+            forkRepoUrl = "https://github.com/yes-a-hit/RPClient-Unoffical",
+            forkRepoName = "yes-a-hit/RPClient-Unoffical",
             forkEmail = "yes0a0hit@gmail.com"
         ),
         onBack = {},

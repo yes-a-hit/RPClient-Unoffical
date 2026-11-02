@@ -25,7 +25,7 @@ object AppModel : KotprefModel(), PromptPreferences {
     const val GITHUB_REPO = "https://github.com/KafuuNeko/RPClient"
 
     // 定制分支仓库地址。
-    const val UV_GITHUB_REPO = "https://github.com/yes-a-hit/RPClient"
+    const val UV_GITHUB_REPO = "https://github.com/yes-a-hit/RPClient-Unoffical"
 
     // 默认美元兑人民币汇率，用于把美元报价折算成人民币展示。
     const val DEFAULT_USD_TO_CNY = "7.2"
