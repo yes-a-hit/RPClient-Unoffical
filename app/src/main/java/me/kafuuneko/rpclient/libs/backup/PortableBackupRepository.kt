@@ -7,7 +7,9 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteStatement
 import android.net.Uri
 import android.util.Base64
+import android.util.Log
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -42,6 +44,17 @@ class PortableBackupRepository(
         private const val MAX_BYTES = 2L * 1024 * 1024 * 1024
         private const val TABLE_ROWS_KEY = "_tableRows"
         private const val BLOB_KEY = "$" + "blobBase64"
+
+        /** 请求日志表：两个正文列过大，必须绕开 CursorWindow 分块读。 */
+        private const val LOG_TABLE = "llm_request_logs"
+
+        /** 单条日志正文的分块大小，与上游取同一个值。 */
+        private const val LOG_PAYLOAD_CHUNK_BYTES = 64 * 1024
+
+        /** 单条日志正文上限；超过的整行跳过，不让一条调试记录卡死整个备份。 */
+        private const val MAX_LOG_PAYLOAD_BYTES = 16 * 1024 * 1024
+
+        private const val TAG = "PortableBackup"
     }
 
     /**
@@ -631,21 +644,100 @@ class PortableBackupRepository(
         table: String,
         whereColumn: String? = null,
         value: Any? = null
-    ): JSONArray {
+    ): JSONArray = JSONArray().apply {
+        queryRows(db, table, whereColumn, value) { put(it) }
+    }
+
+    /**
+     * 逐行读取，请求日志的两个正文列单独分块取。
+     *
+     * `SELECT *` 会把整行一次性塞进 CursorWindow（常见 2 MiB，部分设备 4 MiB）。
+     * `llm_request_logs` 的 requestJson / responseJson 存的是完整请求与响应，
+     * 一条长会话的记录很容易超过这个数——那时 moveToNext 直接抛，
+     * 用户看到的是「备份导出失败」，而且不知道该删哪条日志。
+     *
+     * 与上游 `BackupDatabaseCodec.queryRows` 同一策略，分开实现是因为我们
+     * 这边没有那套 codec 分层，硬搬会连带动一批文件。
+     */
+    private fun queryRows(
+        db: SupportSQLiteDatabase,
+        table: String,
+        whereColumn: String?,
+        value: Any?,
+        action: (JSONObject) -> Unit
+    ) {
         val suffix = if (whereColumn == null) "" else " WHERE " + quote(whereColumn) + " = ?"
-        val sql = "SELECT * FROM " + quote(table) + suffix
+        val isRequestLog = table == LOG_TABLE
+        // 两个正文列先占位，真正的值在游标之外分块取
+        val projection = if (isRequestLog) logProjection(db) else "*"
+        val sql = "SELECT " + projection + " FROM " + quote(table) + suffix
         val arguments: Array<Any?> = if (whereColumn == null) emptyArray() else arrayOf(value)
-        return db.query(sql, arguments).use { cursor ->
-            JSONArray().apply {
-                while (cursor.moveToNext()) {
-                    val row = JSONObject()
-                    for (index in 0 until cursor.columnCount) {
-                        row.put(cursor.getColumnName(index), cursorValue(cursor, index))
-                    }
-                    put(row)
+        db.query(sql, arguments).use { cursor ->
+            while (cursor.moveToNext()) {
+                val row = JSONObject()
+                for (index in 0 until cursor.columnCount) {
+                    row.put(cursor.getColumnName(index), cursorValue(cursor, index))
                 }
+                if (isRequestLog) {
+                    // 单条超上限时整行跳过：一份备份里少一条调试记录，
+                    // 远好过整个导出失败——日志本来就是排障用的，不是用户资产。
+                    val id = row.optLong("id", -1L)
+                    if (id < 0L) continue
+                    val request = readLogPayload(db, id, "requestJson") ?: continue
+                    val response = readLogPayload(db, id, "responseJson") ?: continue
+                    row.put("requestJson", request)
+                    row.put("responseJson", response)
+                }
+                action(row)
             }
         }
+    }
+
+    /** 动态保留日志表的扩展列，只用空占位替代两个可能超出窗口的正文列。 */
+    private fun logProjection(db: SupportSQLiteDatabase): String {
+        return db.query("PRAGMA table_info(" + quote(LOG_TABLE) + ")").use { cursor ->
+            val columns = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                columns += if (name == "requestJson" || name == "responseJson") {
+                    "NULL AS " + quote(name)
+                } else {
+                    quote(name)
+                }
+            }
+            columns.joinToString(", ")
+        }
+    }
+
+    /**
+     * 按 UTF-8 字节偏移分块拼接正文。
+     *
+     * 全部拼完再解码，而不是逐块 decode——多字节字符与代理对会跨块断开，
+     * 逐块解码会在边界处变成替换字符，模型收到的历史就坏了。
+     * 列本身是 NULL 时返回空串（不是 null，null 表示超限跳过）。
+     */
+    private fun readLogPayload(db: SupportSQLiteDatabase, id: Long, column: String): String? {
+        val result = ByteArrayOutputStream()
+        var start = 1
+        while (true) {
+            val chunk = db.query(
+                "SELECT SUBSTR(CAST(" + quote(column) + " AS BLOB), ?, ?) FROM " +
+                    quote(LOG_TABLE) + " WHERE id = ?",
+                arrayOf<Any>(start, LOG_PAYLOAD_CHUNK_BYTES, id)
+            ).use { cursor ->
+                if (!cursor.moveToFirst()) return ""
+                if (cursor.isNull(0)) return ""
+                cursor.getBlob(0)
+            }
+            if (result.size().toLong() + chunk.size > MAX_LOG_PAYLOAD_BYTES) {
+                Log.w(TAG, "请求日志正文超过上限，跳过 id=" + id + " 列=" + column)
+                return null
+            }
+            result.write(chunk)
+            if (chunk.size < LOG_PAYLOAD_CHUNK_BYTES) break
+            start += chunk.size
+        }
+        return result.toString("UTF-8")
     }
 
     private fun tableRows(vararg tables: Pair<String, JSONArray>): JSONObject {
