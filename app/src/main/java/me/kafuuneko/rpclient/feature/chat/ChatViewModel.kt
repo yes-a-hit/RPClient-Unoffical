@@ -263,7 +263,8 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
      */
     @UiIntentObserver(ChatUiIntent.FilesPicked::class)
     private suspend fun onFilesPicked(intent: ChatUiIntent.FilesPicked) {
-        val uiState = getOrNull<ChatUiState.Normal>() ?: return
+        // 只做状态守卫：真正的写入在末尾基于最新状态做，不用这份快照
+        if (getOrNull<ChatUiState.Normal>() == null) return
         // 选完文件先分流：图片交给图片管线（后续要过压缩、GIF 抽帧、进消息附件表），
         // 不能塞进草稿当文本——那样模型只看到一串乱码。其余按文档读文字。
         val images = intent.uris.filter { isImageUri(it) }
@@ -326,11 +327,10 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             AppViewEvent.PopupToastMessage(mContext.getString(R.string.attach_file_unsupported)).tryEmit()
             return
         }
-        uiState.copy(
-            conversationState = uiState.conversationState.copy(
-                attachedDocuments = uiState.conversationState.attachedDocuments + saved
-            )
-        ).setup()
+        // 状态必须基于「当前」值增量改：这条链路中间有两次 withContext(IO)，
+        // 期间 onResume 触发的刷新随时可能跑完。拿开头那份快照写回，附件会被
+        // 刷新结果盖掉——提示说成功了、输入框上方却什么都没有，就是这个原因。
+        attachDocuments(saved)
         // 明确回执：附件条是有还是没，一眼能分清是「没读到」还是「读到了没显示」
         AppViewEvent.PopupToastMessage(
             "已附加 " + saved.size + " 份：" + saved.joinToString("、") { it.name }
@@ -340,12 +340,34 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
     /** 撤掉一份文档附件。 */
     @UiIntentObserver(ChatUiIntent.RemoveAttachedDocument::class)
     private suspend fun onRemoveAttachedDocument(intent: ChatUiIntent.RemoveAttachedDocument) {
-        val uiState = getOrNull<ChatUiState.Normal>() ?: return
-        val remaining = uiState.conversationState.attachedDocuments
-            .filterIndexed { index, _ -> index != intent.index }
-        uiState.copy(
-            conversationState = uiState.conversationState.copy(attachedDocuments = remaining)
-        ).setup()
+        updateState { state ->
+            val normal = state as? ChatUiState.Normal ?: return@updateState state
+            val remaining = normal.conversationState.attachedDocuments
+                .filterIndexed { index, _ -> index != intent.index }
+            normal.copy(
+                conversationState = normal.conversationState.copy(attachedDocuments = remaining)
+            )
+        }
+    }
+
+    /** 把新读到的文档挂到输入区；每次都基于最新状态追加，不覆盖别处刚改的字段。 */
+    private fun attachDocuments(added: List<me.kafuuneko.rpclient.libs.media.AttachedDocument>) {
+        if (added.isEmpty()) return
+        updateState { state ->
+            val normal = state as? ChatUiState.Normal ?: return@updateState state
+            normal.copy(
+                conversationState = normal.conversationState.copy(
+                    attachedDocuments = normal.conversationState.attachedDocuments + added
+                )
+            )
+        }
+        // 写完立刻读回来核对：提示说成功了、界面却没有，只能靠这一行分辨是
+        // 状态没写进去，还是写进去了没渲染
+        android.util.Log.d(
+            "ChatDoc",
+            "挂载后当前附件数=" +
+                getOrNull<ChatUiState.Normal>()?.conversationState?.attachedDocuments?.size
+        )
     }
 
     /**
@@ -488,10 +510,22 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             return
         }
         // 结合当前导出任务状态更新弹窗状态并刷新 UI
+        // 重建期间输入区可能刚变过（典型场景：从系统文件选择器回来，onResume 与
+        // 文件回调几乎同时到，附件是后挂上的）。数据库投影管不到附件，
+        // 一律用最新的现场值补回去，否则刚附加的文件会被这次刷新抹掉。
+        // 草稿不动——清空草稿依赖调用方显式传空串，这里覆盖会把它吃掉。
+        val latest = getOrNull<ChatUiState.Normal>()
         refreshed.copy(
             dialogState = refreshed.dialogState.resolveExportDialogState(
                 isExportActive = mChatExportJob?.isActive == true
-            )
+            ),
+            conversationState = if (latest == null) {
+                refreshed.conversationState
+            } else {
+                refreshed.conversationState.copy(
+                    attachedDocuments = latest.conversationState.attachedDocuments
+                )
+            }
         ).setup()
     }
 
@@ -781,9 +815,12 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         // 又会在下一次发送时被重复拼进消息。发送失败也不恢复——
         // 失败的是这次请求，不是用户手里的文件。
         if (attachments.isNotEmpty()) {
-            uiState.copy(
-                conversationState = uiState.conversationState.copy(attachedDocuments = emptyList())
-            ).setup()
+            updateState { state ->
+                val normal = state as? ChatUiState.Normal ?: return@updateState state
+                normal.copy(
+                    conversationState = normal.conversationState.copy(attachedDocuments = emptyList())
+                )
+            }
         }
         // 文档附件的正文只在这一步拼进来：输入框保持干净，消息里保留完整内容。
         val rawInput = (
@@ -2855,7 +2892,10 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         editingMessageId: String? = null,
         editingMessageDraft: String = "",
         dialogState: ChatDialogState = ChatDialogState.None,
-        attachedDocuments: List<AttachedDocument> = emptyList(),
+        // 默认取「当前正在编辑的那份」而不是空表：任何一次漏传都不该让用户
+        // 刚附加的文件凭空消失。调用方要清空（发送后）必须显式传 emptyList()。
+        attachedDocuments: List<AttachedDocument> = getOrNull<ChatUiState.Normal>()
+            ?.conversationState?.attachedDocuments.orEmpty(),
         messageLimit: Int = MESSAGE_PAGE_SIZE
     ): ChatUiState.Normal? {
         // 查询会话基础数据、角色人设及最近消息窗口

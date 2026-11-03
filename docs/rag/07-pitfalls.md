@@ -18,6 +18,32 @@
 
 **处置习惯**：加状态字段时，同步 `grep` 一遍这个字段名在状态重建处出现几次；加 Intent 时，同步确认有 observer。编译通过不代表接上了。
 
+### 变体：拿快照写回，把期间的变化盖掉
+
+比「漏传字段」更隐蔽。写法是
+
+```kotlin
+val uiState = getOrNull<ChatUiState.Normal>() ?: return
+val x = withContext(Dispatchers.IO) { ... }   // 这里可能几百毫秒
+uiState.copy(...).setup()                     // 用的是几百毫秒前的快照
+```
+
+`uiState` 是取值那一刻的快照。IO 期间任何别的意图把状态推进了（最典型：从系统文件选择器回来，
+`onResume` 的刷新和文件回调几乎同时到），这一行写回时就把对方的成果整片盖回去。
+日志里一切正常、提示也弹了，界面却没变。
+
+**实例**：文档附件「提示附加成功、输入框上方什么都没有」。`onResume` 调 `loadNormalState`
+时没有传 `attachedDocuments`，默认值落回 `emptyList()`，而它的 IO 比文件读取慢，
+最后一步 `setup()` 把刚挂上的附件清空。
+
+**处置**：
+1. 需要在 await 之后改状态时，用 `updateState { }`（`CoreViewModel.kt`，内部走
+   `MutableStateFlow.update` 的 CAS 循环），不要把 `uiState.copy()` 写回去；
+2. 状态重建函数里，凡是「数据库里没有、只存在于输入区」的字段（附件、草稿、展开态），
+   默认值一律取当前状态而不是空值，要清空必须显式传 `emptyList()`；
+3. 重建完 `setup()` 之前，把这类现场字段从最新状态补回去——`onLoadOlderMessages`
+   已经是正确范例（它在 IO 之后重新 `getOrNull()` 取最新值）。
+
 ## 三、加纯函数 + 用例 ≠ 接上线
 
 **症状**：逻辑测试全绿，功能没反应。

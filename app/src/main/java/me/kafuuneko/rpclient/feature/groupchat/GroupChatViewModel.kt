@@ -259,7 +259,7 @@ class GroupChatViewModel :
 
     @UiIntentObserver(GroupChatUiIntent.FilesPicked::class)
     private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {
-        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
+        if (getOrNull<GroupChatUiState.Normal>() == null) return
         // 文件选择器不限类型，用户可能顺手选了图；先分出来走图片，别当文本读
         val images = intent.uris.filter { isImageUri(it) }
         if (images.isNotEmpty()) {
@@ -315,22 +315,42 @@ class GroupChatViewModel :
             ).tryEmit()
             return
         }
-        uiState.copy(
-            conversationState = uiState.conversationState.copy(
-                attachedDocuments = uiState.conversationState.attachedDocuments + saved
-            )
-        ).setup()
+        // 与单聊同理：中途有两次 withContext(IO)，onResume 的刷新随时可能插进来，
+        // 拿开头那份快照写回会把附件盖掉，表现成「提示成功但界面上什么都没有」。
+        attachDocuments(saved)
     }
 
     /** 撤掉一份文档附件。 */
     @UiIntentObserver(GroupChatUiIntent.RemoveAttachedDocument::class)
     private suspend fun onRemoveAttachedDocument(intent: GroupChatUiIntent.RemoveAttachedDocument) {
-        val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
-        val remaining = uiState.conversationState.attachedDocuments
-            .filterIndexed { index, _ -> index != intent.index }
-        uiState.copy(
-            conversationState = uiState.conversationState.copy(attachedDocuments = remaining)
-        ).setup()
+        updateState { state ->
+            val normal = state as? GroupChatUiState.Normal ?: return@updateState state
+            val remaining = normal.conversationState.attachedDocuments
+                .filterIndexed { index, _ -> index != intent.index }
+            normal.copy(
+                conversationState = normal.conversationState.copy(attachedDocuments = remaining)
+            )
+        }
+    }
+
+    /** 把新读到的文档挂到输入区；每次都基于最新状态追加。 */
+    private fun attachDocuments(
+        added: List<me.kafuuneko.rpclient.libs.media.AttachedDocument>
+    ) {
+        if (added.isEmpty()) return
+        updateState { state ->
+            val normal = state as? GroupChatUiState.Normal ?: return@updateState state
+            normal.copy(
+                conversationState = normal.conversationState.copy(
+                    attachedDocuments = normal.conversationState.attachedDocuments + added
+                )
+            )
+        }
+        android.util.Log.d(
+            "ChatDoc",
+            "群聊挂载后当前附件数=" +
+                getOrNull<GroupChatUiState.Normal>()?.conversationState?.attachedDocuments?.size
+        )
     }
 
     /** 按 MIME 与扩展名双重判断，部分文件管理器的 getType 会返回空。 */
@@ -1178,9 +1198,14 @@ class GroupChatViewModel :
             val attachments = uiState.conversationState.attachedDocuments
             // 附件进了发送流程就从输入区摘掉，避免下一次又被拼一遍
             if (attachments.isNotEmpty()) {
-                uiState.copy(
-                    conversationState = uiState.conversationState.copy(attachedDocuments = emptyList())
-                ).setup()
+                updateState { state ->
+                    val normal = state as? GroupChatUiState.Normal ?: return@updateState state
+                    normal.copy(
+                        conversationState = normal.conversationState.copy(
+                            attachedDocuments = emptyList()
+                        )
+                    )
+                }
             }
             // 文档正文只拼在落库的消息上，不参与场景指令解析与发言者选择——
             // 那两步看的是「用户说了什么」，不是「文件里写了什么」。
@@ -2854,7 +2879,20 @@ class GroupChatViewModel :
             )
         } ?: return
         mPendingMemberOrder = null
-        next.setup()
+        // 重建期间的附件要补回来：从系统文件选择器回来时，onResume 的刷新
+        // 与文件回调几乎同时发生，数据库投影管不到附件，会被这次 setup 抹掉。
+        // 草稿不动——发送后清空草稿依赖调用方显式传空串，这里覆盖会把它吃掉。
+        val latest = getOrNull<GroupChatUiState.Normal>()
+        val merged = if (latest == null) {
+            next
+        } else {
+            next.copy(
+                conversationState = next.conversationState.copy(
+                    attachedDocuments = latest.conversationState.attachedDocuments
+                )
+            )
+        }
+        merged.setup()
     }
 
     /**
@@ -2881,7 +2919,10 @@ class GroupChatViewModel :
         editingMessageId: Long? = null,
         editingMessageDraft: String = "",
         dialogState: GroupChatDialogState = GroupChatDialogState.None,
-        attachedDocuments: List<me.kafuuneko.rpclient.libs.media.AttachedDocument> = emptyList(),
+        // 同单聊：默认沿用输入区当前那份，漏传不该让刚附加的文件消失；
+        // 要清空必须显式传 emptyList()
+        attachedDocuments: List<me.kafuuneko.rpclient.libs.media.AttachedDocument> =
+            getOrNull<GroupChatUiState.Normal>()?.conversationState?.attachedDocuments.orEmpty(),
         messageLimit: Int = MESSAGE_PAGE_SIZE
     ): GroupChatUiState.Normal? {
         // 查询群聊会话、成员与最近消息窗口

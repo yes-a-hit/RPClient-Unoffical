@@ -46,6 +46,9 @@ feature/chat/
 - `@UiIntentObserver(SomeIntent::class)` 标注在 ViewModel 的挂起函数上，框架负责分发。
 - 发意图：`ChatUiIntent.XxxClick.emit()`（Compose 里直接用）。
 - 改状态：`getOrNull<ChatUiState.Normal>()?.copy(...)?.setup()`。
+- 需要 await 之后再改状态：`updateState { state -> ... }`（`CoreViewModel.kt`）。
+  `updateState` 每次读当前值并用 `MutableStateFlow.update` 的 CAS 循环写回，
+  不会像 `uiState.copy()` 那样把 IO 期间别人的改动整片盖掉。详见 07 篇第二条变体。
 - 抛一次性事件（Toast、开新页）：`AppViewEvent.Xxx.tryEmit()`，Activity 侧收。
 
 **这里有一个反复出现的坑**：状态字段加在哪一层决定了界面认不认它。`ChatUiState.Normal` 上的字段（如 `pokeActionEditorVisible`）一改就弹；`ChatConversationState` 里的字段只在会话区生效。写错过一次，编译能过、界面永远不响应，只能靠 `grep` 同类字段的位置来定位。

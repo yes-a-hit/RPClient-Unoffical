@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -205,5 +206,19 @@ abstract class CoreViewModel<I, S>(initStatus: S) : ViewModel() {
     /** 发布新的完整 UI 状态。 */
     protected fun S.setup() {
         mUiStateFlow.value = this
+    }
+
+    /**
+     * 基于**当前**状态做一次增量修改。
+     *
+     * 直接用 `getOrNull<T>()?.copy(...)?.setup()` 会先取一份快照。只要中间有任何
+     * `withContext`、任何别的意图跑过，写回时就会把期间发生的变化整片盖回去——
+     * 表现是「操作成功了但界面没反应」，而且日志里一切正常，最难查。
+     *
+     * 这里每次重新读当前值，并且用 [MutableStateFlow.update] 的 compareAndSet 循环，
+     * 保证并发写不会互相吞掉。调用方只需要关心自己真正要改的那几个字段。
+     */
+    protected fun updateState(transform: (S) -> S) {
+        mUiStateFlow.update(transform)
     }
 }
