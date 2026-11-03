@@ -79,6 +79,7 @@ import me.kafuuneko.rpclient.libs.media.DocumentText
 import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.media.MessageImageCoordinator
 import me.kafuuneko.rpclient.libs.media.MessageImageRuntime
+import me.kafuuneko.rpclient.libs.media.PickedFileReader
 import me.kafuuneko.rpclient.libs.prompt.ChatPromptBuilder
 import me.kafuuneko.rpclient.libs.prompt.INITIAL_SUMMARY_CANDIDATE_WINDOW_SIZE
 import me.kafuuneko.rpclient.libs.prompt.SummaryPromptBuilder
@@ -267,51 +268,33 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         if (getOrNull<ChatUiState.Normal>() == null) return
         // 选完文件先分流：图片交给图片管线（后续要过压缩、GIF 抽帧、进消息附件表），
         // 不能塞进草稿当文本——那样模型只看到一串乱码。其余按文档读文字。
-        val images = intent.uris.filter { isImageUri(it) }
-        if (images.isNotEmpty()) {
+        // 分流与读正文都在 PickedFileReader 里，单聊群聊共用同一份，
+        // 免得两边各修一次 bug 之后行为分叉。
+        val picked = mFileReader.read(intent.uris)
+        if (picked.hasImages) {
             // 图片管线要求先登记「这一批结果是为哪个草稿选的」，否则 Picked 回来时
             // pendingPick 为空，会被判成「没有对应的选择请求」直接报图片无法处理。
             // 系统相册入口在开 Activity 之前就调了这个，附加文件这条路没有，所以在这里补。
             mImageCoordinator.choose(editing = false)
-            mImageCoordinator.handle(MessageImageAction.Picked(images))
+            mImageCoordinator.handle(MessageImageAction.Picked(picked.images))
         }
-        val documents = intent.uris.filterNot { isImageUri(it) }
-        if (documents.isEmpty()) {
-            // 全都当成图片走掉了，或者是空选择：两种情况都不该静默
-            AppViewEvent.PopupToastMessage(
-                "选了 " + intent.uris.size + " 个，没有可当文档读的（图片 " + images.size + " 个）"
-            ).tryEmit()
-            return
-        }
-        val read: List<AttachedDocument> = withContext(Dispatchers.IO) {
-            documents.mapNotNull { uri ->
-                // 单个文件读失败不能带走整批：选择器回来的一批里有坏文件时，
-                // 抛出去会让整个意图中断，表现成「选完什么都没发生」
-                runCatching {
-                    val name = displayNameOf(uri) ?: "未命名文件"
-                    // docx 是 zip，当文本读只会得到乱码，单独抽正文
-                    val text = if (DocumentText.isDocx(name)) {
-                        DocumentText.readDocx(mContext.contentResolver, uri)
-                    } else {
-                        readTextFileContent(uri)
-                    }
-                    text?.takeIf { it.isNotBlank() }?.let {
-                        AttachedDocument(id = DocumentStore.newId(), name = name, text = it)
-                    }
-                }.onFailure {
-                    android.util.Log.w("ChatDoc", "读取失败：" + uri, it)
-                }.getOrNull()
-            }
-        }
-        if (read.isEmpty()) {
-            // 读不出文字时留一条日志：空白界面最难查，至少能从 logcat 看出是这一步挡的
-            android.util.Log.w("ChatDoc", "附加文件没有产生任何文档：uris=" + intent.uris.size)
-            AppViewEvent.PopupToastMessage(
+        if (!picked.hasDocuments) {
+            // 三种情况都要有回执：全被当成图片、空选择、选中的都读不出正文。
+            // 静默是这类问题最难查的原因——用户只看到「点了没反应」。
+            android.util.Log.w(
+                "ChatDoc",
+                "附加文件没有产生文档：选中=" + picked.pickedCount + " 图片=" + picked.imageCount
+            )
+            val reason = if (picked.hasImages) {
+                "选了 " + picked.pickedCount + " 个，没有可当文档读的（图片 " + picked.imageCount + " 个）"
+            } else {
                 mContext.getString(R.string.attach_file_unsupported) +
-                    "（选中 " + documents.size + " 个，都读不出正文）"
-            ).tryEmit()
+                    "（选中 " + picked.pickedCount + " 个，都读不出正文）"
+            }
+            AppViewEvent.PopupToastMessage(reason).tryEmit()
             return
         }
+        val read = picked.documents
         android.util.Log.d("ChatDoc", "附加文件 " + read.size + " 份：" + read.joinToString { it.name + "(" + it.charCount + "字)" })
         // 正文先落盘，消息体里只留引用：气泡干净，撤掉附件时文件也还在库里。
         // 落盘失败不能连累整条链路——磁盘满、目录被删都会抛，
@@ -371,42 +354,12 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
     }
 
     /**
-     * 这个 URI 是不是图片。
+     * 文件选择器回来的一批 URI 的分流与读正文。
      *
-     * 先看 contentResolver 报的 MIME——大多数来源是准的。有些第三方文件管理器把
-     * `.webp`、`.gif` 报成 `application/octet-stream`，所以再按扩展名兜一层。
+     * 单聊和群聊共用同一份实现（`libs/media/PickedFileReader.kt`）。
+     * 两份代码各修过一次 bug 之后就会分叉，所以提取出来。
      */
-    private fun isImageUri(uri: Uri): Boolean {
-        val mime = runCatching { mContext.contentResolver.getType(uri) }.getOrNull().orEmpty().lowercase()
-        if (mime.startsWith("image/")) return true
-        return IMAGE_EXTENSIONS.any { displayNameOf(uri)?.lowercase()?.endsWith(it) == true }
-    }
-
-    /** 从 contentResolver 查文件的显示名（带扩展名）；查不到退回 URI 末段。 */
-    private fun displayNameOf(uri: Uri): String? = runCatching {
-        mContext.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
-    }.getOrNull() ?: uri.lastPathSegment
-
-    /** 读取单个文件的 UTF-8 文本（上限 512KB），二进制或失败返回 null。 */
-    private fun readTextFileContent(uri: Uri): String? = try {        mContext.contentResolver.openInputStream(uri)?.use { stream ->
-            val limit = 512 * 1024
-            val buffer = ByteArrayOutputStream()
-            val chunk = ByteArray(8192)
-            var total = 0
-            while (total < limit) {
-                val read = stream.read(chunk, 0, minOf(chunk.size, limit - total))
-                if (read < 0) break
-                buffer.write(chunk, 0, read)
-                total += read
-            }
-            if (total == 0) return@use null
-            val text = buffer.toString("UTF-8")
-            if (text.contains('\u0000')) null else text.trim()
-        }
-    } catch (_: Exception) {
-        null
-    }
+    private val mFileReader by inject<PickedFileReader>()
 
     private val mChatRepository by inject<ChatRepository>()
     private val mCharacterRepository by inject<CharacterRepository>()
@@ -3119,11 +3072,6 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
     private companion object {
         /** 聊天页面首次和后续向前加载的单页消息数量。 */
         const val MESSAGE_PAGE_SIZE = 50
-
-        /** MIME 不可靠时按这些扩展名把文件认成图片。 */
-        private val IMAGE_EXTENSIONS = listOf(
-            ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".heic", ".heif"
-        )
 
         /** 背景图解码目标宽度，与主流手机竖屏逻辑宽度相当。 */
         const val BACKGROUND_SAMPLE_WIDTH = 1080

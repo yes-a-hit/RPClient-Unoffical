@@ -262,6 +262,7 @@ internal val appModules = module {
     single { AssistantSessionStore(androidContext()) }
     single { GalleryStore(androidContext(), get()) }
     single { me.kafuuneko.rpclient.libs.media.DocumentStore(androidContext()) }
+    single { me.kafuuneko.rpclient.libs.media.PickedFileReader(androidContext()) }
     single { AssistantToolExecutor(get<AssistantStore>().sandboxRoot, get(), get(), get(), get()) }
 
     // 计费：只保留服务商余额查询，金额估算已整块移除

@@ -79,6 +79,7 @@ import me.kafuuneko.rpclient.libs.llm.model.LLMGenerationRequest
 import me.kafuuneko.rpclient.libs.llm.model.LLMStreamEvent
 import me.kafuuneko.rpclient.libs.room.model.MessageImageInput
 import me.kafuuneko.rpclient.libs.media.MessageImageRuntime
+import me.kafuuneko.rpclient.libs.media.PickedFileReader
 import me.kafuuneko.rpclient.libs.poke.PokeAction
 import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.libs.prompt.INITIAL_SUMMARY_CANDIDATE_WINDOW_SIZE
@@ -260,46 +261,33 @@ class GroupChatViewModel :
     @UiIntentObserver(GroupChatUiIntent.FilesPicked::class)
     private suspend fun onFilesPicked(intent: GroupChatUiIntent.FilesPicked) {
         if (getOrNull<GroupChatUiState.Normal>() == null) return
-        // 文件选择器不限类型，用户可能顺手选了图；先分出来走图片，别当文本读
-        val images = intent.uris.filter { isImageUri(it) }
-        if (images.isNotEmpty()) {
+        // 文件选择器不限类型，用户可能顺手选了图；先分出来走图片，别当文本读。
+        // 分流与读正文都在 PickedFileReader 里，与单聊同一份实现。
+        val picked = mFileReader.read(intent.uris)
+        if (picked.hasImages) {
             // 与单聊同因：附加文件这条路没有走过「登记选择目标」，不补这一步
             // 图片回来时会被判成无主结果，一律报图片无法处理。
             mImageCoordinator.choose(editing = false)
-            mImageCoordinator.handle(MessageImageAction.Picked(images))
+            mImageCoordinator.handle(MessageImageAction.Picked(picked.images))
         }
-        val documents = intent.uris.filterNot { isImageUri(it) }
-        if (documents.isEmpty()) return
-        // 文档不塞输入框：几万字正文贴进去既看不清也改不动，
-        // 只存文件名与正文，UI 显示成一条可删的附件，发送时再拼进消息。
-        val read: List<me.kafuuneko.rpclient.libs.media.AttachedDocument> = withContext(Dispatchers.IO) {
-            documents.mapNotNull { uri ->
-                // 单个文件读失败不能带走整批，否则整条意图中断、表现成「什么都没发生」
-                runCatching {
-                    val name = displayNameOf(uri) ?: "未命名文件"
-                    val text = if (DocumentText.isDocx(name)) {
-                        DocumentText.readDocx(mContext.contentResolver, uri)
-                    } else {
-                        readTextFileContent(uri)
-                    }
-                    text?.takeIf { it.isNotBlank() }?.let {
-                        me.kafuuneko.rpclient.libs.media.AttachedDocument(
-                            id = me.kafuuneko.rpclient.libs.media.DocumentStore.newId(),
-                            name = name,
-                            text = it
-                        )
-                    }
-                }.onFailure {
-                    android.util.Log.w("ChatDoc", "读取失败：" + uri, it)
-                }.getOrNull()
+        if (!picked.hasDocuments) {
+            // 群聊这边原来什么回执都没有，用户只能看到「点了没反应」
+            android.util.Log.w(
+                "ChatDoc",
+                "群聊附加文件没有产生文档：选中=" + picked.pickedCount + " 图片=" + picked.imageCount
+            )
+            val reason = if (picked.hasImages) {
+                "选了 " + picked.pickedCount + " 个，没有可当文档读的（图片 " + picked.imageCount + " 个）"
+            } else {
+                mContext.getString(R.string.attach_file_unsupported) +
+                    "（选中 " + picked.pickedCount + " 个，都读不出正文）"
             }
-        }
-        if (read.isEmpty()) {
-            AppViewEvent.PopupToastMessage(
-                mContext.getString(R.string.attach_file_unsupported)
-            ).tryEmit()
+            AppViewEvent.PopupToastMessage(reason).tryEmit()
             return
         }
+        // 文档不塞输入框：几万字正文贴进去既看不清也改不动，
+        // 只存文件名与正文，UI 显示成一条可删的附件，发送时再拼进消息。
+        val read = picked.documents
         // 正文先落盘：消息体里只留引用，气泡才不会被几万字撑开。
         // 落盘失败不能连累整条链路，否则表现成「点了没反应」。
         val saved = withContext(Dispatchers.IO) {
@@ -353,44 +341,13 @@ class GroupChatViewModel :
         )
     }
 
-    /** 按 MIME 与扩展名双重判断，部分文件管理器的 getType 会返回空。 */
-    private fun isImageUri(uri: Uri): Boolean {
-        val mime = runCatching { mContext.contentResolver.getType(uri) }
-            .getOrNull().orEmpty().lowercase()
-        if (mime.startsWith("image/")) return true
-        val name = displayNameOf(uri)?.lowercase() ?: return false
-        return IMAGE_EXTENSIONS.any { name.endsWith(it) }
-    }
-
-    private fun displayNameOf(uri: Uri): String? = runCatching {
-        mContext.contentResolver.query(
-            uri,
-            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
-            null,
-            null,
-            null
-        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
-    }.getOrNull() ?: uri.lastPathSegment
-
-    /** 读取文本文件内容；二进制或空文件返回 null。 */
-    private suspend fun readTextFileContent(uri: Uri): String? = withContext(Dispatchers.IO) {
-        runCatching {
-            mContext.contentResolver.openInputStream(uri)?.use { input ->
-                val buffer = ByteArrayOutputStream()
-                val bytes = ByteArray(8192)
-                var total = 0
-                while (true) {
-                    val read = input.read(bytes)
-                    if (read < 0) break
-                    total += read
-                    if (total > 512 * 1024) break
-                    buffer.write(bytes, 0, read)
-                }
-                val content = buffer.toString("UTF-8")
-                if (content.isBlank() || content.contains('\u0000')) null else content.trim()
-            }
-        }.getOrNull()
-    }
+    /**
+     * 文件选择器回来的一批 URI 的分流与读正文。
+     *
+     * 与单聊共用 `libs/media/PickedFileReader.kt` 同一份实现——
+     * 两份代码各修过一次 bug 之后就会分叉，所以提取出来。
+     */
+    private val mFileReader by inject<PickedFileReader>()
 
     private val mGroupChatRepository by inject<GroupChatRepository>()
 
@@ -3370,11 +3327,6 @@ class GroupChatViewModel :
     private companion object {
         /** 自动群聊模式下，两轮生成之间的短暂缓冲延时（毫秒）。 */
         const val AUTO_MODE_DELAY_MS = 500L
-
-        /** 文件选择器不限类型，靠扩展名兜住 getType 返回空的图片。 */
-        val IMAGE_EXTENSIONS = listOf(
-            ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".heic", ".heif"
-        )
 
     /** 群聊页面首次和后续向前加载的单页消息数量。 */
         const val MESSAGE_PAGE_SIZE = 50
