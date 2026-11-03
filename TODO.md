@@ -25,6 +25,14 @@ GIF 抽帧、系统相册选择器、聊天内图库挑图、助手导出文件�
 - 仓库改名 `RPClient-Unoffical`，关于页地址同步
 - RAG 知识库 `docs/rag/` 八篇
 - 修掉 androidTest 积债（`MultimodalImageIntegrationTest` 编译错）
+- 文档附件不再被刷新抹掉（`CoreViewModel.updateState`，见下条「技术债」）
+- 文件分流与读正文收进 `PickedFileReader`，单聊群聊不再各写一份
+
+**技术债已还的部分**：
+- `CoreViewModel.updateState { }`：需要在 await 之后改状态时用它，不再拿开头那份快照写回。
+  这条坑（IO 期间别人的更新被整片盖掉）写进了 `docs/rag/07-pitfalls.md` 第二条变体。
+- `libs/media/PickedFileReader.kt`：`isImageUri` / `displayNameOf` / `readTextFileContent` /
+  `IMAGE_EXTENSIONS` 原来单聊群聊各一份，各修过 bug，提成一份共用实现 + 6 条分流用例。
 
 **已证伪、不必再做**：
 - 非 Debug 跳过日志：全项目 `Log.[dewiv](` 只有 9 处且全在剧本模块，
@@ -51,16 +59,19 @@ GIF 抽帧、系统相册选择器、聊天内图库挑图、助手导出文件�
 
 **验收**：点「+ → 附加图片」进自己的页；相册下拉能滚出全部相册；能选 GIF 且预览会动。
 
-### 2. 文件附件为什么「又坏了」
+### 2. 文件附件「又坏了」——已定位并修
 
-**为什么**：11-03 报过一次，静态链路（选择器 → 分流 → 读文本 → 落盘 → 建状态 → 附件条）
-全通，没能定位断点。当时加了三处 toast 与日志，但没有新的复现信息。
+**结论**：不是链路断，是**竞态**。`onResume` 调 `loadNormalState` 时没有传
+`attachedDocuments`，默认值落回 `emptyList()`；从系统文件选择器回来时，它的刷新
+和文件回调几乎同时发生，文件读取慢一步，刚挂上的附件就被这次 `setup()` 抹掉——
+提示说附加成功，输入框上方什么都没有。
 
-**做法**：不猜。等下次复现时拿三样东西——toast 原文、`adb logcat -s ChatDoc` 的几行、
-文件的实际后缀。若还是复现不了，就把 `onFilesPicked` 改成分步日志（进方法 / 读完 / 落盘完
-/ 状态写完各一条），一次跑准。
+修法三层（见提交 `36957193`）：挂载/移除/发送清空改用 `updateState`；重建函数的
+该字段默认值改为取当前状态；重建后 `setup()` 前把最新附件补回去。
 
-**验收**：能贴出「选中 N 个、读出 N 份、落盘 N 份、附件条 N 条」四个数字对得上。
+**仍需验证**：真机再走一遍「选两份 txt/docx → 看到两条附件条 → 发送 → 气泡里是折叠卡片
+→ 点开能看到正文」。若再次复现，拿三样东西：toast 原文、`adb logcat -s ChatDoc`、
+文件后缀。
 
 ---
 
