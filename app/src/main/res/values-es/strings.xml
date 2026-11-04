@@ -1603,4 +1603,9 @@
     <string name="group_chat_scene_banner_absent">Silenciados: %1$s</string>
     <string name="group_chat_scene_banner_lorebook">Lorebook: solo %1$d entradas en esta escena</string>
     <string name="group_chat_scene_banner_secret">Salida discreta: quien se quedó no sabe adónde fueron</string>
+    <string name="group_chat_scene_keywords">Palabras clave (valen con el cambio automático activo)</string>
+    <string name="group_chat_scene_keyword_hint">Escribe términos, sepáralos con comas</string>
+    <string name="group_chat_scene_keyword_add">Añadir</string>
+    <string name="group_chat_scene_lorebook_hint">Lorebook de esta escena (ninguna marcada = sin límite)</string>
+    <string name="group_chat_lorebook_entry_fallback">Entrada %1$d</string>
 </resources>

@@ -1596,4 +1596,9 @@
     <string name="group_chat_scene_banner_absent">음소거: %1$s</string>
     <string name="group_chat_scene_banner_lorebook">세계관: 이 장면에서는 %1$d개만 사용</string>
     <string name="group_chat_scene_banner_secret">몰래 이동: 남은 사람들은 어디로 갔는지 모릅니다</string>
+    <string name="group_chat_scene_keywords">키워드 (자동 전환이 켜져 있을 때 적용)</string>
+    <string name="group_chat_scene_keyword_hint">단어 입력, 쉼표로 여러 개 가능</string>
+    <string name="group_chat_scene_keyword_add">추가</string>
+    <string name="group_chat_scene_lorebook_hint">이 장면의 세계관 (선택 없음 = 제한 없음)</string>
+    <string name="group_chat_lorebook_entry_fallback">항목 %1$d</string>
 </resources>

@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Book
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
@@ -74,6 +75,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -318,7 +320,7 @@ internal fun SceneEditorDialog(
             // 世界书：勾了就只剩这几条生效，一条不勾表示这一场不做限制
             if (lorebookGroups.isNotEmpty()) {
                 Text(
-                    text = "本场世界书（一条不勾表示不限制）",
+                    text = stringResource(R.string.group_chat_scene_lorebook_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -339,13 +341,65 @@ internal fun SceneEditorDialog(
                                 },
                                 label = {
                                     Text(
-                                        text = entry.name.ifBlank { "条目 " + entry.id },
+                                        text = entry.name.ifBlank {
+                                            stringResource(
+                                                R.string.group_chat_lorebook_entry_fallback,
+                                                entry.id
+                                            )
+                                        },
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             )
                         }
+                    }
+                }
+            }
+            // 关键词：只有开了实验性模块才会被用到，所以在这里说清楚它是给谁配的
+            Text(
+                text = stringResource(R.string.group_chat_scene_keywords),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = dialogState.keywordDraft,
+                    onValueChange = {
+                        emitIntent(GroupChatUiIntent.ChangeSceneEditorKeywordDraft(it))
+                    },
+                    modifier = Modifier.weight(1f),
+                    label = { Text(stringResource(R.string.group_chat_scene_keyword_hint)) },
+                    singleLine = true
+                )
+                TextButton(
+                    onClick = { emitIntent(GroupChatUiIntent.AddSceneEditorKeyword) },
+                    enabled = dialogState.keywordDraft.isNotBlank()
+                ) {
+                    Text(stringResource(R.string.group_chat_scene_keyword_add))
+                }
+            }
+            if (dialogState.keywords.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    dialogState.keywords.forEach { keyword ->
+                        InputChip(
+                            selected = false,
+                            onClick = {
+                                emitIntent(GroupChatUiIntent.RemoveSceneEditorKeyword(keyword))
+                            },
+                            label = { Text(keyword) },
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        )
                     }
                 }
             }

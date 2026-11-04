@@ -1602,4 +1602,9 @@ Mở Cài đặt mô hình để kiểm tra khóa API, URL cơ sở, tên mô h�
     <string name="group_chat_scene_banner_absent">Đã tắt tiếng: %1$s</string>
     <string name="group_chat_scene_banner_lorebook">Lorebook: cảnh này chỉ dùng %1$d mục</string>
     <string name="group_chat_scene_banner_secret">Đi lặng lẽ: người ở lại không biết đã đi đâu</string>
+    <string name="group_chat_scene_keywords">Từ khóa (chỉ dùng khi bật tự đổi cảnh)</string>
+    <string name="group_chat_scene_keyword_hint">Nhập từ, cách nhau bằng dấu phẩy</string>
+    <string name="group_chat_scene_keyword_add">Thêm</string>
+    <string name="group_chat_scene_lorebook_hint">Lorebook cảnh này (không chọn = không giới hạn)</string>
+    <string name="group_chat_lorebook_entry_fallback">Mục %1$d</string>
 </resources>

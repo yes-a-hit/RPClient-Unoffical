@@ -2260,6 +2260,7 @@ class GroupChatViewModel :
                 visibility = target?.visibility
                     ?: me.kafuuneko.rpclient.libs.groupchat.model.SceneVisibility.Open,
                 backgroundUuid = target?.backgroundUuid.orEmpty(),
+                keywords = target?.keywords.orEmpty(),
             )
         ).setup()
     }
@@ -2307,6 +2308,44 @@ class GroupChatViewModel :
         intent: GroupChatUiIntent.ChangeSceneEditorVisibility
     ) {
         updateSceneEditor { it.copy(visibility = intent.value) }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.ChangeSceneEditorKeywordDraft::class)
+    private fun onChangeSceneEditorKeywordDraft(
+        intent: GroupChatUiIntent.ChangeSceneEditorKeywordDraft
+    ) {
+        updateSceneEditor { it.copy(keywordDraft = intent.value) }
+    }
+
+    /**
+     * 把输入框里的词收进关键词表。
+     *
+     * 允许多个词用逗号或顿号一次粘进来：主人抄剧本设定时通常是
+     * 一整串「厨房、灶台、做饭」，逼他一格一个太折腾。
+     */
+    @UiIntentObserver(GroupChatUiIntent.AddSceneEditorKeyword::class)
+    private fun onAddSceneEditorKeyword() {
+        updateSceneEditor { editor ->
+            val incoming = editor.keywordDraft
+                .split(',', '，', '、', ';', '；')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            if (incoming.isEmpty()) {
+                editor.copy(keywordDraft = "")
+            } else {
+                editor.copy(
+                    keywords = (editor.keywords + incoming).distinct(),
+                    keywordDraft = ""
+                )
+            }
+        }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.RemoveSceneEditorKeyword::class)
+    private fun onRemoveSceneEditorKeyword(
+        intent: GroupChatUiIntent.RemoveSceneEditorKeyword
+    ) {
+        updateSceneEditor { it.copy(keywords = it.keywords.filterNot { k -> k == intent.keyword }) }
     }
 
     @UiIntentObserver(GroupChatUiIntent.PickSceneBackground::class)
@@ -2357,6 +2396,7 @@ class GroupChatViewModel :
             lorebookEntryIds = editor.lorebookEntryIds.toList(),
             visibility = editor.visibility,
             backgroundUuid = editor.backgroundUuid,
+            keywords = editor.keywords,
         )
         val updated = if (existing.any { it.id == sceneId }) {
             existing.map { if (it.id == sceneId) scene else it }

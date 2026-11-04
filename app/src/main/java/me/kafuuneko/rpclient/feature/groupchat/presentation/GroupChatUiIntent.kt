@@ -163,6 +163,15 @@ sealed class GroupChatUiIntent {
     /** 给这个场景单独挑一张背景图。 */
     data object PickSceneBackground : GroupChatUiIntent()
 
+    /** 改关键词输入框里还没提交的那半个词。 */
+    data class ChangeSceneEditorKeywordDraft(val value: String) : GroupChatUiIntent()
+
+    /** 把输入框里的词加进这一场的关键词表。 */
+    data object AddSceneEditorKeyword : GroupChatUiIntent()
+
+    /** 从关键词表里去掉一个。 */
+    data class RemoveSceneEditorKeyword(val keyword: String) : GroupChatUiIntent()
+
     /** 场景背景图选好了。 */
     data class SceneBackgroundPicked(val uri: android.net.Uri) : GroupChatUiIntent()
 

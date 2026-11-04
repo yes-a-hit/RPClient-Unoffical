@@ -1602,4 +1602,9 @@ Buka Pengaturan Model untuk memeriksa kunci API, URL dasar, nama model, dan izin
     <string name="group_chat_scene_banner_absent">Dibisukan: %1$s</string>
     <string name="group_chat_scene_banner_lorebook">Lorebook: hanya %1$d entri di adegan ini</string>
     <string name="group_chat_scene_banner_secret">Pergi diam-diam: yang tertinggal tidak tahu ke mana</string>
+    <string name="group_chat_scene_keywords">Kata kunci (berlaku bila ganti otomatis aktif)</string>
+    <string name="group_chat_scene_keyword_hint">Ketik istilah, pisahkan dengan koma</string>
+    <string name="group_chat_scene_keyword_add">Tambah</string>
+    <string name="group_chat_scene_lorebook_hint">Lorebook adegan ini (tanpa centang = tanpa batas)</string>
+    <string name="group_chat_lorebook_entry_fallback">Entri %1$d</string>
 </resources>

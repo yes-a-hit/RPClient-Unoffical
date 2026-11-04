@@ -1606,4 +1606,9 @@
     <string name="group_chat_scene_banner_absent">Без звука: %1$s</string>
     <string name="group_chat_scene_banner_lorebook">Лорбук: в этой сцене только %1$d записей</string>
     <string name="group_chat_scene_banner_secret">Ушли тихо: оставшиеся не знают куда</string>
+    <string name="group_chat_scene_keywords">Ключевые слова (работают при включённом автопереходе)</string>
+    <string name="group_chat_scene_keyword_hint">Введите слова через запятую</string>
+    <string name="group_chat_scene_keyword_add">Добавить</string>
+    <string name="group_chat_scene_lorebook_hint">Лорбук этой сцены (ничего не отмечено = без ограничений)</string>
+    <string name="group_chat_lorebook_entry_fallback">Запись %1$d</string>
 </resources>

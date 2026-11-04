@@ -1580,4 +1580,9 @@ Apri le impostazioni del modello per verificare la chiave API, l\'URL di base, i
     <string name="group_chat_scene_banner_absent">Silenziati: %1$s</string>
     <string name="group_chat_scene_banner_lorebook">Lorebook: solo %1$d voci in questa scena</string>
     <string name="group_chat_scene_banner_secret">Uscita discreta: chi resta non sa dove siete</string>
+    <string name="group_chat_scene_keywords">Parole chiave (valgono col cambio automatico attivo)</string>
+    <string name="group_chat_scene_keyword_hint">Inserisci termini, separali con virgole</string>
+    <string name="group_chat_scene_keyword_add">Aggiungi</string>
+    <string name="group_chat_scene_lorebook_hint">Lorebook di questa scena (nessuna = senza limiti)</string>
+    <string name="group_chat_lorebook_entry_fallback">Voce %1$d</string>
 </resources>

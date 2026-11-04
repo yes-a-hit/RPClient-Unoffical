@@ -1597,4 +1597,9 @@
     <string name="group_chat_scene_banner_absent">ミュート：%1$s</string>
     <string name="group_chat_scene_banner_lorebook">世界設定：このシーンでは %1$d 件のみ有効</string>
     <string name="group_chat_scene_banner_secret">こっそり移動：残った人たちは行き先を知りません</string>
+    <string name="group_chat_scene_keywords">キーワード（自動切替をオンにすると有効）</string>
+    <string name="group_chat_scene_keyword_hint">語を入力（カンマ区切りで複数可）</string>
+    <string name="group_chat_scene_keyword_add">追加</string>
+    <string name="group_chat_scene_lorebook_hint">このシーンの世界設定（未選択なら制限なし）</string>
+    <string name="group_chat_lorebook_entry_fallback">項目 %1$d</string>
 </resources>

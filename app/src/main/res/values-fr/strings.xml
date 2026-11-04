@@ -1602,4 +1602,9 @@
     <string name="group_chat_scene_banner_absent">En sourdine : %1$s</string>
     <string name="group_chat_scene_banner_lorebook">Lorebook : seulement %1$d entrées ici</string>
     <string name="group_chat_scene_banner_secret">Départ discret : ceux qui restent ne savent pas où vous êtes</string>
+    <string name="group_chat_scene_keywords">Mots-clés (actifs avec le changement automatique)</string>
+    <string name="group_chat_scene_keyword_hint">Saisir des termes, séparés par des virgules</string>
+    <string name="group_chat_scene_keyword_add">Ajouter</string>
+    <string name="group_chat_scene_lorebook_hint">Lorebook de cette scène (aucune sélection = sans limite)</string>
+    <string name="group_chat_lorebook_entry_fallback">Entrée %1$d</string>
 </resources>

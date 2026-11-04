@@ -1601,4 +1601,9 @@
     <string name="group_chat_scene_banner_absent">Stumm: %1$s</string>
     <string name="group_chat_scene_banner_lorebook">Lorebook: nur %1$d Einträge in dieser Szene</string>
     <string name="group_chat_scene_banner_secret">Heimlich gegangen: Zurückgebliebene wissen nicht wohin</string>
+    <string name="group_chat_scene_keywords">Stichwörter (gelten bei aktivem Auto-Wechsel)</string>
+    <string name="group_chat_scene_keyword_hint">Begriffe eingeben, mit Komma trennen</string>
+    <string name="group_chat_scene_keyword_add">Hinzufügen</string>
+    <string name="group_chat_scene_lorebook_hint">Lorebook dieser Szene (keine Auswahl = keine Grenze)</string>
+    <string name="group_chat_lorebook_entry_fallback">Eintrag %1$d</string>
 </resources>

@@ -1596,4 +1596,9 @@
     <string name="group_chat_scene_banner_absent">已闭麦：%1$s</string>
     <string name="group_chat_scene_banner_lorebook">世界书：本场只用勾选的 %1$d 条，其余暂时收起</string>
     <string name="group_chat_scene_banner_secret">这次是悄悄走的：没跟过去的人不会知道你们去了哪儿</string>
+    <string name="group_chat_scene_keywords">关键词（打开「关键字自动换场」后生效，说到就进这一场）</string>
+    <string name="group_chat_scene_keyword_hint">输入词语，可用逗号一次填多个</string>
+    <string name="group_chat_scene_keyword_add">加入</string>
+    <string name="group_chat_scene_lorebook_hint">本场世界书（一条不勾表示不限制）</string>
+    <string name="group_chat_lorebook_entry_fallback">条目 %1$d</string>
 </resources>

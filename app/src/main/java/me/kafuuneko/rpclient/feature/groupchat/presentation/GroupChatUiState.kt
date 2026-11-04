@@ -219,6 +219,15 @@ sealed class GroupChatDialogState {
             me.kafuuneko.rpclient.libs.groupchat.model.SceneVisibility.Open,
         /** 本场专用背景图（文件 uuid）；空表示沿用会话背景。 */
         val backgroundUuid: String = "",
+        /**
+         * 说到这些词就自动走进这一场。
+         *
+         * 只有打开实验性模块「关键字自动换场」时才会被用到；
+         * 关着的时候它们只是躺在剧本数据里，不影响任何行为。
+         */
+        val keywords: List<String> = emptyList(),
+        /** 关键词输入框里还没提交的那半个词。 */
+        val keywordDraft: String = "",
     ) : GroupChatDialogState()
 }
 
