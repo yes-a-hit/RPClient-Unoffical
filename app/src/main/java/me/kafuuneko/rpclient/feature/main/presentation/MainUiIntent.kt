@@ -153,6 +153,15 @@ sealed class MainUiIntent {
 
     data object ConfirmImportChat : MainUiIntent()
 
+    /** 导出「带字段说明的数据范本」：先让用户选保存位置。 */
+    data object ExportSampleDocumentClick : MainUiIntent()
+
+    /** 用户选好保存位置后，把范本写进去。 */
+    data class ExportSampleDocumentResult(val uri: Uri) : MainUiIntent()
+
+    /** 关掉更新摘要，并记住这个版本已经看过了。 */
+    data object DismissReleaseNotes : MainUiIntent()
+
     data class ChangeUserName(val value: String) : MainUiIntent()
 
     data class ChangeUserDescription(val value: String) : MainUiIntent()
@@ -259,6 +268,9 @@ sealed class MainUiIntent {
     data class RemovePokeAction(val id: String) : MainUiIntent()
 
     data object SavePokeActions : MainUiIntent()
+
+    /** 开关一个实验性模块。传的是 [me.kafuuneko.rpclient.libs.experimental.ExperimentalFeature.key]。 */
+    data class ToggleExperimentalFeature(val key: String) : MainUiIntent()
 
     data class EnterMultiSelect(val item: MainHomeItemSelection) : MainUiIntent()
 

@@ -87,6 +87,7 @@ import me.kafuuneko.rpclient.feature.main.presentation.MainSkillSettingsState
 import me.kafuuneko.rpclient.libs.imagegen.ImageGenSettings
 import me.kafuuneko.rpclient.libs.skill.SkillImportOutcome
 import me.kafuuneko.rpclient.libs.skill.SkillRepository
+import me.kafuuneko.rpclient.libs.sample.SampleDocument
 import me.kafuuneko.rpclient.libs.chat.ChatArchive
 import me.kafuuneko.rpclient.libs.chat.ChatArchiveRepository
 import me.kafuuneko.rpclient.libs.chat.ChatCharacterMatcher
@@ -152,6 +153,9 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
     private val mSkillRepository by inject<SkillRepository>()
     private val mContext by inject<Context>()
 
+    /** 本进程是否已经判过更新摘要；只在内存里，不落盘。 */
+    private var mReleaseNotesChecked = false
+
     /** 文件解析结果只在用户确认角色前暂存，不进入可持久状态或数据库。 */
     private var mPendingChatImport: ChatArchive? = null
     private var mDirectoryPickArchive: ChatArchive? = null
@@ -208,6 +212,33 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
             homeState = homeState,
             settingsState = settingsState
         ).setup()
+        showReleaseNotesIfNeeded()
+    }
+
+    /**
+     * 这个版本第一次打开时弹一次更新摘要。
+     *
+     * 放在 Resume 的尾巴上而不是初始化里：初始化时状态还没铺好，
+     * 弹窗会被随后的 setup 盖掉。用内存标记保证一次进程只判一次——
+     * 判完不管弹没弹（比如当时别处已经有对话框了）都不再插队。
+     */
+    private fun showReleaseNotesIfNeeded() {
+        if (mReleaseNotesChecked) return
+        mReleaseNotesChecked = true
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        if (uiState.dialogState != MainDialogState.None) return
+        val version = AppModel.UV_VERSION
+        if (AppModel.lastSeenReleaseNotesVersion == version) return
+        uiState.copy(dialogState = MainDialogState.ReleaseNotes(version)).setup()
+    }
+
+    /** 关掉摘要，把「已看过这个版本」写进偏好，下次不再弹。 */
+    @UiIntentObserver(MainUiIntent.DismissReleaseNotes::class)
+    private fun onDismissReleaseNotes() {
+        AppModel.lastSeenReleaseNotesVersion = AppModel.UV_VERSION
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        if (uiState.dialogState !is MainDialogState.ReleaseNotes) return
+        uiState.copy(dialogState = MainDialogState.None).setup()
     }
 
     /** 处理返回键操作：若在多选状态则退出多选；若在设置页则返回首页；若在首页则退出应用。 */
@@ -433,6 +464,53 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
         val uiState = getOrNull<MainUiState.Normal>() ?: return
         if (!uiState.canOpenDialog() || mChatImportJob?.isActive == true) return
         MainViewEvent.OpenChatImporter.tryEmit()
+    }
+
+    /** 导出带字段说明的完整范本：先让用户挑保存位置，写盘放到结果回调里。 */
+    @UiIntentObserver(MainUiIntent.ExportSampleDocumentClick::class)
+    private fun onExportSampleDocumentClick() {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        if (!uiState.canOpenDialog() || mChatImportJob?.isActive == true) return
+        MainViewEvent.CreateSampleDocument(
+            suggestedName = "rpclient-sample-" + AppModel.UV_VERSION + ".json"
+        ).tryEmit()
+    }
+
+    /**
+     * 把范本写进用户选好的位置。
+     *
+     * 生成与写盘都在 IO 上跑——这份文本有几十 KB，主线程上拼字符串会掉帧；
+     * 失败只弹提示，不把 Exception 抛给界面。
+     */
+    @UiIntentObserver(MainUiIntent.ExportSampleDocumentResult::class)
+    private fun onExportSampleDocumentResult(intent: MainUiIntent.ExportSampleDocumentResult) {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        if (uiState.settingsState.chatDataManagementState != MainChatDataManagementState.Idle) return
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                chatDataManagementState = MainChatDataManagementState.Exporting
+            )
+        ).setup()
+        viewModelScope.launch {
+            val success = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = SampleDocument.build(AppModel.UV_VERSION)
+                    mContext.contentResolver.openOutputStream(intent.uri)?.use { stream ->
+                        stream.write(text.toByteArray(Charsets.UTF_8))
+                    } ?: error("Cannot open sample destination")
+                }.isSuccess
+            }
+            AppViewEvent.PopupToastMessageByResId(
+                if (success) R.string.export_sample_success else R.string.export_sample_failed
+            ).tryEmit()
+            getOrNull<MainUiState.Normal>()?.let { current ->
+                current.copy(
+                    settingsState = current.settingsState.copy(
+                        chatDataManagementState = MainChatDataManagementState.Idle
+                    )
+                ).setup()
+            }
+        }
     }
 
     /** 读取并解析导入的聊天存档 JSON 文件，匹配候选角色并弹出角色绑定弹窗。 */
@@ -1193,6 +1271,31 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
                     actions = cleaned,
                     drafts = emptyList(),
                     editorVisible = false
+                )
+            )
+        ).setup()
+    }
+
+    /**
+     * 开关一个实验性模块。
+     *
+     * 开关只改偏好设置，不在 ViewModel 里缓存状态：读写都走
+     * [ExperimentalFlags]，这样别处的功能判断（比如群聊的关键字换场）
+     * 不需要经过首页就能生效。
+     */
+    @UiIntentObserver(MainUiIntent.ToggleExperimentalFeature::class)
+    private fun onToggleExperimentalFeature(intent: MainUiIntent.ToggleExperimentalFeature) {
+        val uiState = getOrNull<MainUiState.Normal>() ?: return
+        val feature = me.kafuuneko.rpclient.libs.experimental.ExperimentalFeature.entries
+            .firstOrNull { it.key == intent.key } ?: return
+        if (!feature.available) return
+        val next = !me.kafuuneko.rpclient.libs.experimental.ExperimentalFlags.isEnabled(feature)
+        me.kafuuneko.rpclient.libs.experimental.ExperimentalFlags.setEnabled(feature, next)
+        uiState.copy(
+            settingsState = uiState.settingsState.copy(
+                experimentalState = me.kafuuneko.rpclient.feature.main.presentation.MainExperimentalState(
+                    enabledKeys = me.kafuuneko.rpclient.libs.experimental.ExperimentalFlags.enabledKeys(),
+                    highRiskCount = me.kafuuneko.rpclient.libs.experimental.ExperimentalFlags.activeHighRiskCount()
                 )
             )
         ).setup()
@@ -1980,6 +2083,10 @@ class MainViewModel : CoreViewModelWithEvent<MainUiIntent, MainUiState>(
             ),
             pokeActionState = MainPokeActionState(
                 actions = me.kafuuneko.rpclient.libs.poke.PokeActions.parse(AppModel.pokeActions)
+            ),
+            experimentalState = me.kafuuneko.rpclient.feature.main.presentation.MainExperimentalState(
+                enabledKeys = me.kafuuneko.rpclient.libs.experimental.ExperimentalFlags.enabledKeys(),
+                highRiskCount = me.kafuuneko.rpclient.libs.experimental.ExperimentalFlags.activeHighRiskCount()
             ),
             appearanceState = MainAppearanceSettingsState(
                 themeMode = mAppThemeManager.themeModeFlow.value,

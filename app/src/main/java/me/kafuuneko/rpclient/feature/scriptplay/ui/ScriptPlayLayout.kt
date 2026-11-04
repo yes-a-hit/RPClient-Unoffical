@@ -157,26 +157,33 @@ fun ScriptPlayLayout(
                     .imePadding()
             ) {
                 SceneBar(state, sceneNames, emit)
-                // 状态面板：只有轮次的话玩家不知道自己处于什么处境。
-                // 剧本级开关关掉时整块不出现，单栏可见性另由变量自己的 visible 决定
-                if (state.showDashboard && state.statusItems.isNotEmpty()) {
-                    StatusStrip(state.statusItems)
-                }
-                // 在场角色：谁在场一目了然，头像横排可滑
-                if (state.castNames.isNotEmpty()) {
-                    CastStrip(
-                        names = state.castNames,
-                        muted = state.mutedCharacters,
-                        avatarOf = avatarOf,
-                        loadAvatar = loadAvatar
-                    )
-                }
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 state = listState,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // 状态面板与在场角色跟着消息一起滚，不占固定高度。
+                // 钉在顶部时键盘一弹，这几块会把对话框挤成一条缝。
+                if (state.showDashboard && state.statusItems.isNotEmpty()) {
+                    item(key = "dashboard") {
+                        StatusStrip(
+                            items = state.statusItems,
+                            expanded = state.dashboardExpanded,
+                            onToggle = { ScriptPlayUiIntent.ToggleDashboard.emit() }
+                        )
+                    }
+                }
+                if (state.castNames.isNotEmpty()) {
+                    item(key = "cast") {
+                        CastStrip(
+                            names = state.castNames,
+                            muted = state.mutedCharacters,
+                            avatarOf = avatarOf,
+                            loadAvatar = loadAvatar
+                        )
+                    }
+                }
                 items(state.messages) { message ->
                     val fromPlayer = message.speaker == PLACEHOLDER_PLAYER
                     if (fromPlayer) {
@@ -675,17 +682,26 @@ private fun CharacterAvatar(
  *
  * 把作者标了可见的变量摊开：电量、信任、线索这类让玩家知道自己
  * 处境如何。有上限的顺便画条进度，光看数字不好判断还剩多少。
+ *
+ * 默认收着。一个剧本挂七八个变量时整块能吃掉小半屏，
+ * 玩家真正要看的是对话，状态扫一眼就够，想看细节再点开。
  */
 @Composable
-private fun StatusStrip(items: List<ScriptStatusItem>) {
+private fun StatusStrip(
+    items: List<ScriptStatusItem>,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    // 折叠时只留摘要行，展开时全摊开
+    val visible = if (expanded) items else items.take(COLLAPSED_STATUS_ROWS)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 2.dp),
+            .padding(vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         var lastGroup = ""
-        items.forEach { item ->
+        visible.forEach { item ->
             // 分组标题只在切换时出现，同组内不重复
             if (item.group.isNotBlank() && item.group != lastGroup) {
                 lastGroup = item.group
@@ -758,5 +774,23 @@ private fun StatusStrip(items: List<ScriptStatusItem>) {
                 }
             }
         }
+        // 条目不多时不给切换，省得点了一下什么都不变
+        if (items.size > COLLAPSED_STATUS_ROWS) {
+            val hidden = items.size - COLLAPSED_STATUS_ROWS
+            Text(
+                text = if (expanded) stringResource(R.string.script_status_collapse)
+                else stringResource(R.string.script_status_expand, hidden),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(onClick = onToggle)
+                    .padding(vertical = 3.dp, horizontal = 2.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
+
+/** 折叠状态下最多铺几行；再多就该让位给对话了。 */
+private const val COLLAPSED_STATUS_ROWS = 3
+

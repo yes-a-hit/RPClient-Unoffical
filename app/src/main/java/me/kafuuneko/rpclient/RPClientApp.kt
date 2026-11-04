@@ -52,6 +52,8 @@ import me.kafuuneko.rpclient.libs.prompt.WorldBookActivator
 import me.kafuuneko.rpclient.libs.prompt.model.ExampleDialogueBehavior
 import me.kafuuneko.rpclient.libs.prompt.model.ExampleDialogueBehaviorProvider
 import me.kafuuneko.rpclient.libs.regex.RegexMessageProcessor
+import me.kafuuneko.rpclient.feature.chat.logic.ChatRegexApplier
+import me.kafuuneko.rpclient.feature.groupchat.logic.GroupChatRegexApplier
 import me.kafuuneko.rpclient.libs.regex.RegexScriptCodec
 import me.kafuuneko.rpclient.libs.regex.RegexScriptEngine
 import me.kafuuneko.rpclient.libs.regex.RegexScriptRepository
@@ -60,6 +62,7 @@ import me.kafuuneko.rpclient.libs.room.AppDatabase
 import me.kafuuneko.rpclient.libs.room.RequestLogDatabase
 import me.kafuuneko.rpclient.libs.room.migration.AppDatabaseMigration5To6
 import me.kafuuneko.rpclient.libs.room.migration.AppDatabaseMigration6To7
+import me.kafuuneko.rpclient.libs.room.migration.AppDatabaseMigration7To8
 import me.kafuuneko.rpclient.libs.room.repository.CharacterRepository
 import me.kafuuneko.rpclient.libs.room.repository.ChatRepository
 import me.kafuuneko.rpclient.libs.room.repository.FileRepository
@@ -69,6 +72,7 @@ import me.kafuuneko.rpclient.libs.room.repository.LLMRequestLogRepository
 import me.kafuuneko.rpclient.libs.room.repository.LLMTokenUsageRepository
 import me.kafuuneko.rpclient.libs.room.repository.LorebookRepository
 import me.kafuuneko.rpclient.libs.room.repository.MessageImageRepository
+import me.kafuuneko.rpclient.libs.room.repository.PageBackgroundRepository
 import me.kafuuneko.rpclient.libs.room.repository.StoryRepository
 import me.kafuuneko.rpclient.libs.story.StoryArchiveCodec
 import me.kafuuneko.rpclient.libs.story.StoryArchiveRepository
@@ -225,7 +229,7 @@ internal val appModules = module {
 
     single {
         Room.databaseBuilder(get(), AppDatabase::class.java, "primary.sqlite")
-            .addMigrations(AppDatabaseMigration5To6, AppDatabaseMigration6To7)
+            .addMigrations(AppDatabaseMigration5To6, AppDatabaseMigration6To7, AppDatabaseMigration7To8)
             .fallbackToDestructiveMigrationOnDowngrade(true)
             .build()
     }
@@ -243,10 +247,13 @@ internal val appModules = module {
     singleOf(::LLMTokenUsageRepository)
     singleOf(::FileRepository)
     singleOf(::MessageImageRepository)
+    singleOf(::PageBackgroundRepository)
     single { MessageImageRuntime(get(), get()) }
     singleOf(::CharacterCardRepository)
     singleOf(::GroupChatRepository)
     singleOf(::RegexScriptRepository)
+    singleOf(::ChatRegexApplier)
+    singleOf(::GroupChatRegexApplier)
     singleOf(::StoryRepository)
 
     // 外接生图链路：客户端负责协议收发，仓库负责把结果落成可提交的文件凭据

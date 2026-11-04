@@ -26,6 +26,7 @@ import me.kafuuneko.rpclient.libs.script.ScriptPlaySceneState
 import me.kafuuneko.rpclient.libs.script.ScriptPlayStore
 import me.kafuuneko.rpclient.libs.script.ScriptPlayEngine
 import me.kafuuneko.rpclient.libs.script.ScriptPlayOutcome
+import me.kafuuneko.rpclient.libs.script.ScriptPlayGuard
 import me.kafuuneko.rpclient.libs.script.ScriptPlaythrough
 import me.kafuuneko.rpclient.libs.script.ScriptScene
 import me.kafuuneko.rpclient.libs.script.ScriptStore
@@ -222,6 +223,38 @@ class ScriptPlayViewModel(
         // 选项块从正文剥离，单独作为候选行动展示
         val parsedReply = ScriptPlayOptionParser.parse(reply)
         val visibleReply = parsedReply.text.ifBlank { reply }
+        // 越界拦截：模型写飞的内容不能进对话。
+        // 一旦落进消息列表就成了既定事实，后面的失败条件与通关条件
+        // 都在拿一段不该发生的故事做判定，怎么判都是错的。
+        val guardHit = ScriptPlayGuard.evaluate(
+            rules = pack.globalGuardRules + scene.guardRules,
+            reply = visibleReply
+        )
+        if (guardHit != null) {
+            // 只留一条系统提示，模型这段文字直接丢掉：
+            // 下一轮构建历史时它拿不到，就不会顺着自己写飞的方向继续
+            mPlay = mPlay.copy(
+                messages = mPlay.messages + ScriptPlayMessage(
+                    SYSTEM,
+                    ScriptPlayGuard.retryNotice(guardHit)
+                )
+            )
+            if (guardHit is ScriptPlayGuard.Hit.Hard) {
+                val reason = ScriptPlayGuard.describe(guardHit)
+                val punishScene = guardHit.rule.failSceneId
+                    .takeIf { it.isNotBlank() }
+                    ?.let { id -> pack.scenes.firstOrNull { it.id == id } }
+                if (punishScene != null) {
+                    enterScene(punishScene, reason)
+                } else {
+                    mPlay = mPlay.copy(finished = true, endReason = reason)
+                }
+            }
+            mCurrentForcedSpeaker = null
+            mPlayStore.save(mPlay)
+            publish()
+            return
+        }
         mPlay = mPlay.copy(
             messages = mPlay.messages + ScriptPlayMessage(scene.name, visibleReply),
             roundCount = mPlay.roundCount + 1
@@ -586,7 +619,8 @@ class ScriptPlayViewModel(
             variables = mPlay.variables.orEmpty(),
             declaredVariables = pack.variables,
             textVariables = mPlay.textVariables.orEmpty(),
-            castProfiles = buildCastProfiles(scene, pack)
+            castProfiles = buildCastProfiles(scene, pack),
+            guardRules = pack.globalGuardRules + scene.guardRules
             )
             val messages = buildList {
                 add(LLMMessage(LLMMessageRole.System, system))
@@ -836,6 +870,13 @@ class ScriptPlayViewModel(
     private fun onCloseGmPanel() {
         val state = getOrNull<ScriptPlayUiState.Ready>() ?: return
         state.copy(gmPanelVisible = false).setup()
+    }
+
+    /** 展开 / 收起状态面板。 */
+    @UiIntentObserver(ScriptPlayUiIntent.ToggleDashboard::class)
+    private fun onToggleDashboard() {
+        val state = getOrNull<ScriptPlayUiState.Ready>() ?: return
+        state.copy(dashboardExpanded = !state.dashboardExpanded).setup()
     }
 
     /** Toggle mute for one character. */

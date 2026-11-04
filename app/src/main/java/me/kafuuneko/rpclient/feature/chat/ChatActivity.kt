@@ -55,6 +55,13 @@ class ChatActivity : CoreActivityWithEvent() {
         if (uris.isNotEmpty()) mViewModel.emit(ChatUiIntent.FilesPicked(uris))
     }
 
+    /** 会话级背景只挑一张，走单选取图。 */
+    private val mBackgroundPicker = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { mViewModel.emit(ChatUiIntent.SessionBackgroundPicked(it)) }
+    }
+
     override fun getViewEventFlow() = mViewModel.viewEventFlow
 
     @Composable
@@ -97,6 +104,8 @@ class ChatActivity : CoreActivityWithEvent() {
                 mImagePicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
 
             ChatViewEvent.OpenFilePicker -> mFilePicker.launch(arrayOf("*/*"))
+
+            ChatViewEvent.PickBackgroundImage -> mBackgroundPicker.launch("image/*")
 
             is ChatViewEvent.SaveImage -> mImageSaver.launch(viewEvent.metadata)
             is ChatViewEvent.CopyText -> copyText(viewEvent.text)

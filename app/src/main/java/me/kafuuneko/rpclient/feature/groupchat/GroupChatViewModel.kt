@@ -89,19 +89,25 @@ import me.kafuuneko.rpclient.libs.prompt.nextSummaryCandidateWindowSize
 import me.kafuuneko.rpclient.libs.prompt.resolveCharacterUserMacros
 import me.kafuuneko.rpclient.libs.prompt.summaryCandidateMessageLimit
 import me.kafuuneko.rpclient.libs.prompt.summarySafeContent
+import me.kafuuneko.rpclient.feature.groupchat.logic.GroupChatRegexApplier
 import me.kafuuneko.rpclient.libs.regex.RegexMessageProcessor
 import me.kafuuneko.rpclient.libs.regex.RegexMessageSource
 import me.kafuuneko.rpclient.libs.regex.RegexScriptRepository
 import me.kafuuneko.rpclient.libs.regex.RegexScriptRuntime
 import me.kafuuneko.rpclient.libs.regex.ScopedRegexScript
 import me.kafuuneko.rpclient.libs.room.entity.GroupChatMessage
+import me.kafuuneko.rpclient.libs.experimental.ExperimentalFeature
+import me.kafuuneko.rpclient.libs.experimental.ExperimentalFlags
 import me.kafuuneko.rpclient.libs.groupchat.GroupChatScenes
+import me.kafuuneko.rpclient.libs.groupchat.GroupChatSceneTransition
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatScene
 import me.kafuuneko.rpclient.libs.groupchat.model.GroupChatSceneCommand
 import me.kafuuneko.rpclient.libs.room.entity.GroupChatSession
 import me.kafuuneko.rpclient.libs.room.entity.LLMProvider
 import me.kafuuneko.rpclient.libs.room.entity.Lorebook
 import me.kafuuneko.rpclient.libs.room.entity.LorebookEntry
+import me.kafuuneko.rpclient.libs.room.entity.PageBackgroundEntity
+import me.kafuuneko.rpclient.ui.widgets.ChatBackgroundUiState
 import me.kafuuneko.rpclient.libs.room.entity.toConfig
 import me.kafuuneko.rpclient.libs.room.model.MessageWithImages
 import me.kafuuneko.rpclient.libs.room.model.SummaryInputSnapshot
@@ -111,6 +117,7 @@ import me.kafuuneko.rpclient.libs.room.repository.GroupChatData
 import me.kafuuneko.rpclient.libs.room.repository.GroupChatMemberData
 import me.kafuuneko.rpclient.libs.room.repository.GroupChatRepository
 import me.kafuuneko.rpclient.libs.room.repository.GroupChatSpeakerSelectionData
+import me.kafuuneko.rpclient.libs.room.repository.PageBackgroundRepository
 import me.kafuuneko.rpclient.libs.room.repository.GroupChatSummaryGenerationData
 import me.kafuuneko.rpclient.libs.room.repository.LLMRepository
 import me.kafuuneko.rpclient.libs.room.repository.LorebookRepository
@@ -144,6 +151,7 @@ class GroupChatViewModel :
     ), KoinComponent {
     // 数据仓库与服务依赖注入
     private val mFileRepository by inject<FileRepository>()
+    private val mPageBackgroundRepository by inject<PageBackgroundRepository>()
     /** 只保存失败批次尚未完成的角色，模式与触发消息作为同一快照更新。 */
     private data class ReplyRetryContext(
         val sessionId: Long,
@@ -354,6 +362,9 @@ class GroupChatViewModel :
     /** 头像缓存：同一角色在一轮渲染里只解码一次。 */
     private val mAvatarImageCache = HashMap<String, androidx.compose.ui.graphics.ImageBitmap?>()
 
+    /** 背景解码缓存：记录上次解析的图片 UUID 与位图，避免每次刷新重解大图。 */
+    private var mBackgroundImageCache: Pair<String, androidx.compose.ui.graphics.ImageBitmap?>? = null
+
     /** 头像缓存：同一角色在一轮渲染里只解码一次。 */
     private val mCharacterRepository by inject<CharacterRepository>()
     private val mLLMRepository by inject<LLMRepository>()
@@ -364,6 +375,7 @@ class GroupChatViewModel :
     private val mOutputSanitizer by inject<GroupChatOutputSanitizer>()
     private val mLorebookRepository by inject<LorebookRepository>()
     private val mRegexRepository by inject<RegexScriptRepository>()
+    private val mRegexApplier by inject<GroupChatRegexApplier>()
     private val mRegexProcessor by inject<RegexMessageProcessor>()
     private val mContext by inject<Context>()
 
@@ -709,47 +721,135 @@ class GroupChatViewModel :
     /**
      * 执行一条场景指令。
      *
-     * 只改会话的 activeSceneId，不写消息记录：场景切换是「视野」变化，
-     * 不是对话内容，塞进历史会污染上下文。
+     * 除了改 activeSceneId，还会补一条系统旁白说明「谁走了、谁到了」。
+     * 不写这条的话，界面是瞬移——上一条还在客厅里说话的人，
+     * 下一条就凭空消失了，看着像被静音而不是「人在别处」。
+     */
+    /**
+     * 执行一次场景切换。
+     *
+     * 场景切换不是换个标题——它是「玩家挪了地方」，对每个人意味不同：
+     * 有人跟着走，有人被留下，有人本来就在那儿等着。所以这里做三件事：
+     *
+     * 1. 算出三拨人（[GroupChatSceneTransition.plan]）
+     * 2. 按公开/隐蔽写出旁白，把「谁被留下了」这个事实留在历史里，
+     *    后面任何人发言时模型都看得见——吃醋、追问全靠这条
+     * 3. 让新场景里的人在切完之后说一句话
+     *
+     * 第 3 步是必须的：只写旁白不生成的话，界面是一句灰色小字之后什么都没有，
+     * 玩家会以为是操作失败。
      */
     private suspend fun applySceneCommand(
         sessionId: Long,
         command: GroupChatSceneCommand
     ) {
-        val session = withContext(Dispatchers.IO) {
-            mGroupChatRepository.getGroupChatData(sessionId)?.session
+        val data = withContext(Dispatchers.IO) {
+            mGroupChatRepository.getGroupChatData(sessionId)
         } ?: return
-        when (command) {
-            GroupChatSceneCommand.Clear -> {
-                withContext(Dispatchers.IO) {
-                    mGroupChatRepository.updateSession(session.copy(activeSceneId = ""))
-                }
-                AppViewEvent.PopupToastMessage(
-                    mContext.getString(R.string.group_chat_scene_cleared)
-                ).tryEmit()
-            }
+        val session = data.session
+        val scenes = GroupChatScenes.decode(session.scenesJson)
+        val previous = GroupChatScenes.active(scenes, session.activeSceneId)
+        val allIds = data.members.map { it.character.id }
+        val nameOf: (Long) -> String = { id ->
+            data.members.firstOrNull { it.character.id == id }?.character?.name.orEmpty()
+        }
 
+        val target: GroupChatScene? = when (command) {
+            GroupChatSceneCommand.NotACommand -> return
+            GroupChatSceneCommand.Clear -> null
             is GroupChatSceneCommand.SwitchTo -> {
-                val scenes = GroupChatScenes.decode(session.scenesJson)
-                val scene = GroupChatScenes.findByName(scenes, command.sceneName)
-                if (scene == null) {
+                val found = GroupChatScenes.findByName(scenes, command.sceneName)
+                if (found == null) {
                     AppViewEvent.PopupToastMessage(
                         mContext.getString(R.string.group_chat_scene_not_found, command.sceneName)
                     ).tryEmit()
                     return
                 }
-                withContext(Dispatchers.IO) {
-                    mGroupChatRepository.updateSession(session.copy(activeSceneId = scene.id))
-                }
-                AppViewEvent.PopupToastMessage(
-                    mContext.getString(R.string.group_chat_scene_switched, scene.name)
-                ).tryEmit()
+                found
             }
-
-            GroupChatSceneCommand.NotACommand -> return
         }
-        // 指令已经被消费掉，输入框不能留着这条命令
+
+        // 原地不动就没必要刷一条旁白，也不该多生成一轮
+        if (previous?.id == target?.id) {
+            refreshState(inputDraft = "")
+            return
+        }
+
+        val plan = GroupChatSceneTransition.plan(
+            from = previous,
+            to = target,
+            allMemberIds = allIds,
+        )
+        val narration = GroupChatSceneTransition.narration(plan, nameOf)
+            .map { narrationText(it) }
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+
+        withContext(Dispatchers.IO) {
+            mGroupChatRepository.updateSession(session.copy(activeSceneId = target?.id.orEmpty()))
+            if (narration.isNotBlank()) appendSceneNarration(sessionId, narration)
+        }
+
+        AppViewEvent.PopupToastMessage(
+            if (target == null) {
+                mContext.getString(R.string.group_chat_scene_cleared)
+            } else {
+                mContext.getString(R.string.group_chat_scene_switched, target.name)
+            }
+        ).tryEmit()
+
         refreshState(inputDraft = "")
+
+        // 新场景里得有人应一声：走进空房间也是一件事，该让在场的人表示一下
+        val presentIds = (plan.companions + plan.alreadyThere).toSet()
+        val speakers = if (presentIds.isEmpty()) {
+            data.members.filter { member ->
+                val allowed = GroupChatScenes.allowedCharacterIds(target)
+                allowed == null || member.character.id in allowed
+            }.take(1)
+        } else {
+            data.members.filter { it.character.id in presentIds }.take(1)
+        }
+        if (speakers.isNotEmpty() && ensureProviderConfigured()) {
+            launchGeneration(sessionId = sessionId, speakers = speakers)
+        }
+    }
+
+    /** 把一段旁白片段翻成当前语言的文本。 */
+    private fun narrationText(part: GroupChatSceneTransition.Part): String = when (part) {
+        is GroupChatSceneTransition.Part.LeaveToEveryone ->
+            mContext.getString(R.string.group_chat_scene_back_to_all, part.from)
+        is GroupChatSceneTransition.Part.EnterAlone ->
+            mContext.getString(R.string.group_chat_scene_enter_alone, part.to)
+        is GroupChatSceneTransition.Part.EnterWith ->
+            mContext.getString(R.string.group_chat_scene_enter_with, part.companions, part.to)
+        is GroupChatSceneTransition.Part.MoveAlone ->
+            mContext.getString(R.string.group_chat_scene_move_alone, part.from, part.to)
+        is GroupChatSceneTransition.Part.MoveWith ->
+            mContext.getString(
+                R.string.group_chat_scene_move_with, part.companions, part.from, part.to
+            )
+        is GroupChatSceneTransition.Part.SlipAway ->
+            mContext.getString(R.string.group_chat_scene_slip_away, part.from, part.to)
+        is GroupChatSceneTransition.Part.SlipAwayWith ->
+            mContext.getString(
+                R.string.group_chat_scene_slip_away_with, part.companions, part.from, part.to
+            )
+        is GroupChatSceneTransition.Part.LeftBehind ->
+            mContext.getString(R.string.group_chat_scene_left_behind, part.names, part.from)
+        is GroupChatSceneTransition.Part.AlreadyThere ->
+            mContext.getString(R.string.group_chat_scene_already_there, part.names)
+    }
+
+    /** 写一条场景旁白。放进历史里，下一轮模型顺着它接。 */
+    private suspend fun appendSceneNarration(sessionId: Long, text: String) {
+        mGroupChatRepository.createMessage(
+            sessionId = sessionId,
+            source = GroupChatMessage.Source.System,
+            content = text,
+            speakerCharacterId = null,
+            speakerNameSnapshot = ""
+        )
     }
 
     /** 点场景标签切换；传 null 回到不限场景。 */    @UiIntentObserver(GroupChatUiIntent.SwitchScene::class)
@@ -1015,6 +1115,51 @@ class GroupChatViewModel :
         onSendMessage()
     }
 
+    /**
+     * 打开系统选图，挑一张当本群聊的背景。
+     *
+     * 只取一张：背景是铺满整页的底图，多选没有意义。
+     */
+    @UiIntentObserver(GroupChatUiIntent.PickSessionBackground::class)
+    private suspend fun onPickSessionBackground() {
+        GroupChatViewEvent.PickBackgroundImage.tryEmit()
+    }
+
+    /** 选图回来，落库后只刷新背景相关的两个字段，避免整页重载。 */
+    @UiIntentObserver(GroupChatUiIntent.SessionBackgroundPicked::class)
+    private suspend fun onSessionBackgroundPicked(intent: GroupChatUiIntent.SessionBackgroundPicked) {
+        val sessionId = mSessionId ?: return
+        val stored = mPageBackgroundRepository.setImageFromUri(
+            page = PageBackgroundEntity.groupPage(sessionId),
+            uri = intent.uri
+        )
+        if (stored == null) {
+            AppViewEvent.PopupToastMessageByResId(R.string.image_prepare_failed).tryEmit()
+            return
+        }
+        refreshBackgroundOnly(sessionId, hasOwn = true)
+    }
+
+    /** 丢掉本群聊的背景，回到跟全局一致。 */
+    @UiIntentObserver(GroupChatUiIntent.ClearSessionBackground::class)
+    private suspend fun onClearSessionBackground() {
+        val sessionId = mSessionId ?: return
+        mPageBackgroundRepository.clearImage(PageBackgroundEntity.groupPage(sessionId))
+        refreshBackgroundOnly(sessionId, hasOwn = false)
+    }
+
+    /** 只更新背景相关的两个字段，其它状态原样保留。 */
+    private suspend fun refreshBackgroundOnly(sessionId: Long, hasOwn: Boolean) {
+        val backgroundState = resolveBackgroundState(sessionId)
+        updateState { state ->
+            if (state is GroupChatUiState.Normal) {
+                state.copy(backgroundState = backgroundState, hasOwnBackground = hasOwn)
+            } else {
+                state
+            }
+        }
+    }
+
     private fun loadPokeActions(): List<PokeAction> {
         val stored = PokeActions.parse(AppModel.pokeActions)
         val legacy = AppModel.pokePrompt.trim()
@@ -1137,6 +1282,29 @@ class GroupChatViewModel :
             if (sceneCommand !is GroupChatSceneCommand.NotACommand) {
                 applySceneCommand(sessionId, sceneCommand)
                 return
+            }
+            // 实验性：关键字换场。默认关闭，开了也只在明确命中场景关键词时才动，
+            // 否则一句「厨房里好像有动静」会把整场搬走
+            if (ExperimentalFlags.isEnabled(ExperimentalFeature.SceneKeywordSwitch) &&
+                rawInput.isNotBlank()
+            ) {
+                val session = withContext(Dispatchers.IO) {
+                    mGroupChatRepository.getGroupChatData(sessionId)
+                }?.session
+                if (session != null) {
+                    val matched = GroupChatScenes.matchByKeyword(
+                        scenes = GroupChatScenes.decode(session.scenesJson),
+                        text = rawInput,
+                        activeSceneId = session.activeSceneId,
+                    )
+                    if (matched != null) {
+                        applySceneCommand(
+                            sessionId,
+                            GroupChatSceneCommand.SwitchTo(matched.name)
+                        )
+                        return
+                    }
+                }
             }
             val selectionData = withContext(Dispatchers.IO) {
                 mGroupChatRepository.getSpeakerSelectionData(
@@ -2054,6 +2222,8 @@ class GroupChatViewModel :
         ).setup()
         withContext(Dispatchers.IO) {
             mGroupChatRepository.deleteSession(uiState.sessionId)
+            // 会话没了，它专用的背景也没有主人了；不清会一直占着一张图
+            mPageBackgroundRepository.clearByPrefix(PageBackgroundEntity.groupPage(uiState.sessionId))
         }
         clearReplyRetry()
         GroupChatUiState.finished(uiStateFlow.value).setup()
@@ -2077,13 +2247,19 @@ class GroupChatViewModel :
         val target = intent.sceneId?.let { id ->
             GroupChatScenes.decode(session.scenesJson).firstOrNull { it.id == id }
         }
+        // 「全员」第一次被打开时还没有配置，用一个默认名让它能直接保存
+        val isDefaultScene = intent.sceneId == GroupChatScenes.DEFAULT_SCENE_ID
         uiState.copy(
             dialogState = GroupChatDialogState.SceneEditor(
-                sceneId = target?.id,
-                name = target?.name.orEmpty(),
+                sceneId = intent.sceneId,
+                name = target?.name
+                    ?: if (isDefaultScene) mContext.getString(R.string.group_chat_scene_all) else "",
                 memberIds = target?.characterIds?.toSet().orEmpty(),
                 description = target?.description.orEmpty(),
-                lorebookEntryIds = target?.lorebookEntryIds?.toSet().orEmpty()
+                lorebookEntryIds = target?.lorebookEntryIds?.toSet().orEmpty(),
+                visibility = target?.visibility
+                    ?: me.kafuuneko.rpclient.libs.groupchat.model.SceneVisibility.Open,
+                backgroundUuid = target?.backgroundUuid.orEmpty(),
             )
         ).setup()
     }
@@ -2126,6 +2302,41 @@ class GroupChatViewModel :
         uiState.copy(dialogState = transform(editor)).setup()
     }
 
+    @UiIntentObserver(GroupChatUiIntent.ChangeSceneEditorVisibility::class)
+    private fun onChangeSceneEditorVisibility(
+        intent: GroupChatUiIntent.ChangeSceneEditorVisibility
+    ) {
+        updateSceneEditor { it.copy(visibility = intent.value) }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.PickSceneBackground::class)
+    private fun onPickSceneBackground() {
+        GroupChatViewEvent.PickSceneBackgroundImage.tryEmit()
+    }
+
+    /**
+     * 场景背景先存成文件再记 uuid，和会话背景走同一条存储链路。
+     *
+     * 编辑器还没保存时也要能挑图——这时 uuid 先挂在草稿上，
+     * 点保存才落进场景；取消的话文件留着，下次能选回来。
+     */
+    @UiIntentObserver(GroupChatUiIntent.SceneBackgroundPicked::class)
+    private suspend fun onSceneBackgroundPicked(intent: GroupChatUiIntent.SceneBackgroundPicked) {
+        val uuid = runCatching {
+            withContext(Dispatchers.IO) { mFileRepository.saveFile(intent.uri) }
+        }.getOrNull()
+        if (uuid.isNullOrBlank()) {
+            AppViewEvent.PopupToastMessageByResId(R.string.image_prepare_failed).tryEmit()
+            return
+        }
+        updateSceneEditor { it.copy(backgroundUuid = uuid) }
+    }
+
+    @UiIntentObserver(GroupChatUiIntent.ClearSceneBackground::class)
+    private fun onClearSceneBackground() {
+        updateSceneEditor { it.copy(backgroundUuid = "") }
+    }
+
     @UiIntentObserver(GroupChatUiIntent.SaveSceneEditor::class)
     private suspend fun onSaveSceneEditor() {
         val uiState = getOrNull<GroupChatUiState.Normal>() ?: return
@@ -2137,17 +2348,20 @@ class GroupChatViewModel :
             mGroupChatRepository.getGroupChatData(uiState.sessionId)?.session
         } ?: return
         val existing = GroupChatScenes.decode(session.scenesJson)
+        val sceneId = editor.sceneId ?: UUID.randomUUID().toString()
         val scene = GroupChatScene(
-            id = editor.sceneId ?: UUID.randomUUID().toString(),
+            id = sceneId,
             name = name,
             description = editor.description.trim(),
             characterIds = editor.memberIds.toList(),
-            lorebookEntryIds = editor.lorebookEntryIds.toList()
+            lorebookEntryIds = editor.lorebookEntryIds.toList(),
+            visibility = editor.visibility,
+            backgroundUuid = editor.backgroundUuid,
         )
-        val updated = if (editor.sceneId == null) {
-            existing + scene
+        val updated = if (existing.any { it.id == sceneId }) {
+            existing.map { if (it.id == sceneId) scene else it }
         } else {
-            existing.map { if (it.id == scene.id) scene else it }
+            existing + scene
         }
         withContext(Dispatchers.IO) {
             mGroupChatRepository.updateSession(
@@ -2970,19 +3184,34 @@ class GroupChatViewModel :
         }
         // 场景标签要能直接看出「这一场有谁」，所以把角色 ID 换成名字
         val nameById = data.members.associate { it.character.id to it.character.name }
-        val sceneItems = GroupChatScenes.decode(data.session.scenesJson).map { scene ->
+        val sceneList = GroupChatScenes.decode(data.session.scenesJson)
+        // 当前场景自己的背景优先于会话背景，换场景时页面才会跟着换视野；
+        // 没设场景时落到「全员」那份配置上，所以默认场景也能有自己的背景
+        val activeSceneBackgroundUuid = GroupChatScenes
+            .activeForDisplay(sceneList, data.session.activeSceneId)
+            ?.backgroundUuid
+            .orEmpty()
+        val sceneItems = sceneList.map { scene ->
             GroupChatSceneItem(
                 id = scene.id,
                 name = scene.name,
                 memberNames = scene.characterIds.mapNotNull { nameById[it] },
                 restrictMembers = scene.restrictsMembers,
-                lorebookEntryIds = scene.lorebookEntryIds
+                lorebookEntryIds = scene.lorebookEntryIds,
+                isSecret = scene.visibility ==
+                    me.kafuuneko.rpclient.libs.groupchat.model.SceneVisibility.Secret,
+                hasOwnBackground = scene.backgroundUuid.isNotBlank(),
             )
         }
         // 构建并返回群聊完整 UI 状态
         return GroupChatUiState.Normal(
             imageState = mImageCoordinator.state,
             sessionId = sessionId,
+            backgroundState = resolveBackgroundState(sessionId, activeSceneBackgroundUuid),
+            // 主键查一次很便宜，比让 resolveBackgroundState 返回复合结构更直观
+            hasOwnBackground = runCatching {
+                mPageBackgroundRepository.imageUuid(PageBackgroundEntity.groupPage(sessionId))
+            }.getOrNull() != null,
             title = data.session.title,
             members = members,
             activeActivationStrategy = data.session.activationStrategy
@@ -3142,12 +3371,12 @@ class GroupChatViewModel :
         input: String,
         isEdit: Boolean = false
     ): String {
-        val scripts = mRegexRepository.activeScripts(data.members.map { it.character })
-        val macros = groupRegexMacros(
-            data,
-            data.members.firstOrNull()?.character?.name.orEmpty()
+        val prepared = mRegexApplier.prepare(
+            characters = data.members.map { it.character },
+            session = data.session,
+            memberNames = data.members.map { it.character.name }
         )
-        return mRegexProcessor.applyUserInput(input, scripts, macros, isEdit)
+        return mRegexApplier.applyUserInput(prepared, input, isEdit)
     }
 
     /**
@@ -3165,12 +3394,12 @@ class GroupChatViewModel :
         characterName: String,
         isEdit: Boolean = false
     ): String {
-        return mRegexProcessor.applyAiResponse(
-            input,
-            mRegexRepository.activeScripts(data.members.map { it.character }),
-            groupRegexMacros(data, characterName),
-            isEdit = isEdit
+        val prepared = mRegexApplier.prepare(
+            characters = data.members.map { it.character },
+            session = data.session,
+            memberNames = data.members.map { it.character.name }
         )
+        return mRegexApplier.applyAiResponse(prepared, characterName, input, isEdit)
     }
 
     /**
@@ -3199,15 +3428,15 @@ class GroupChatViewModel :
     private fun groupRegexMacros(
         data: GroupChatData,
         characterName: String
-    ): Map<String, String> {
-        return RegexScriptRuntime.macros(
+    ): Map<String, String> = GroupChatRegexApplier.macros(
+        context = GroupChatRegexApplier.Context(
             userName = data.session.userName,
-            characterName = characterName,
             userDescription = data.session.userDescription,
             scenario = data.session.scenario,
-            groupNames = data.members.joinToString(", ") { it.character.name }
-        )
-    }
+            memberNames = data.members.map { it.character.name }
+        ),
+        speakerName = characterName
+    )
 
     /**
      * 弹出 Toast 提示并退出当前群聊页面。
@@ -3303,6 +3532,41 @@ class GroupChatViewModel :
     )
 
     /**
+     * 解析群聊页背景。
+     *
+     * 顺序：「当前场景自己挑的 → 这个群聊设过的 → 全局设置 → 纯色」。
+     * 场景排在最前是因为换场景本来就该换视野，背景不跟着换等于只换了名单。
+     */
+    private suspend fun resolveBackgroundState(
+        sessionId: Long,
+        sceneBackgroundUuid: String = ""
+    ): ChatBackgroundUiState {
+        val dimPercent = AppModel.chatBackgroundDim
+        val sessionUuid = runCatching {
+            mPageBackgroundRepository.imageUuid(PageBackgroundEntity.groupPage(sessionId))
+        }.getOrNull()
+        val imageUuid = sceneBackgroundUuid.takeIf { it.isNotBlank() }
+            ?: sessionUuid
+            ?: AppModel.chatBackgroundImage.takeIf { it.isNotBlank() }
+        if (imageUuid.isNullOrBlank()) return ChatBackgroundUiState(dimPercent = dimPercent)
+        mBackgroundImageCache?.let { (cachedUuid, cachedImage) ->
+            if (cachedUuid == imageUuid) {
+                return ChatBackgroundUiState(image = cachedImage, dimPercent = dimPercent)
+            }
+        }
+        // 与单聊同一组采样尺寸，避免两边解码策略不一致导致内存表现不同
+        val image = withContext(Dispatchers.IO) {
+            mFileRepository.loadSampledBitmap(
+                uuid = imageUuid,
+                requestedWidthPx = BACKGROUND_SAMPLE_WIDTH,
+                requestedHeightPx = BACKGROUND_SAMPLE_HEIGHT
+            )?.asImageBitmap()
+        }
+        mBackgroundImageCache = imageUuid to image
+        return ChatBackgroundUiState(image = image, dimPercent = dimPercent)
+    }
+
+    /**
      * 按文件 UUID 解码头像，带缓存。
      *
      * 群聊一屏可能有十几条消息，每条都去解码会明显卡顿，
@@ -3330,6 +3594,10 @@ class GroupChatViewModel :
 
     /** 群聊页面首次和后续向前加载的单页消息数量。 */
         const val MESSAGE_PAGE_SIZE = 50
+
+        /** 背景图解码目标尺寸，与单聊保持一致。 */
+        const val BACKGROUND_SAMPLE_WIDTH = 1080
+        const val BACKGROUND_SAMPLE_HEIGHT = 2400
     }
 }
 

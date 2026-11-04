@@ -17,6 +17,16 @@ object GroupChatScenes {
     private val SWITCH_PREFIXES = listOf("/去 ", "/前往 ", "/scene ", "/go ")
     private val CLEAR_PREFIXES = listOf("/清除场景", "/离开场景", "/scene off", "/scene clear")
 
+    /**
+     * 「全员」这个默认场景的固定 id。
+     *
+     * 「全员」原本只是「没设场景」的另一种说法，界面上却是一个跟别的场景
+     * 长得不一样的标签——用户看不出它也能配背景、也能改名字。
+     * 给它一个固定 id 之后它就是普通场景了：照样能编辑、能有自己的背景，
+     * 只是不参与成员过滤（[allowedCharacterIds] 对它永远返回 null）。
+     */
+    const val DEFAULT_SCENE_ID = "*"
+
     private val mListType = object : TypeToken<List<GroupChatScene>>() {}.type
 
     /**
@@ -54,7 +64,24 @@ object GroupChatScenes {
     /** 按 id 找当前生效的场景；未设置或找不到时返回 null。 */
     fun active(scenes: List<GroupChatScene>, activeSceneId: String?): GroupChatScene? {
         if (activeSceneId.isNullOrBlank()) return null
+        // 「全员」不是一个过滤条件，回到它等于回到不设场景
+        if (activeSceneId == DEFAULT_SCENE_ID) return null
         return scenes.firstOrNull { it.id == activeSceneId }
+    }
+
+    /** 「全员」场景的展示配置；没配过返回 null。 */
+    fun defaultScene(scenes: List<GroupChatScene>): GroupChatScene? =
+        scenes.firstOrNull { it.id == DEFAULT_SCENE_ID }
+
+    /**
+     * 页面上真正在用的那一场，包含「全员」。
+     *
+     * [active] 对「全员」返回 null（它不过滤成员），但背景、提示词这些
+     * 展示层的东西还是要认它，所以另给一个不吞掉默认场景的入口。
+     */
+    fun activeForDisplay(scenes: List<GroupChatScene>, activeSceneId: String?): GroupChatScene? {
+        val id = activeSceneId?.takeIf { it.isNotBlank() } ?: DEFAULT_SCENE_ID
+        return scenes.firstOrNull { it.id == id }
     }
 
     /**
@@ -141,7 +168,7 @@ object GroupChatScenes {
     fun movements(scenes: List<GroupChatScene>, activeSceneId: String?): List<SceneMovement> {
         val active = active(scenes, activeSceneId)
         val enter = scenes
-            .filter { it.id != active?.id }
+            .filter { it.id != active?.id && it.id != DEFAULT_SCENE_ID }
             .map { SceneMovement(sceneId = it.id, name = it.name, isLeave = false) }
         if (active == null) return enter
         return enter + SceneMovement(sceneId = "", name = active.name, isLeave = true)
@@ -149,4 +176,38 @@ object GroupChatScenes {
 
     /** 一条可执行的动作：进某个场景，或者从当前场景退回全员。 */
     data class SceneMovement(val sceneId: String, val name: String, val isLeave: Boolean)
+
+    /**
+     * 按关键字猜「玩家这句话是往哪走」。
+     *
+     * 只在实验开关打开时被调用。判据是「命中字数最多的那个场景」——
+     * 同一个词被两个场景共享时，长的那个更具体，也更容易是用户的真实意图。
+     * 已经在当前场景时不算「往这里走」，返回 null，避免原地刷一轮旁白。
+     *
+     * 返回 null 还有一层含义：不确定。宁可不动，也不要为了「有反应」
+     * 把整场搬到用户没打算去的地方。
+     */
+    fun matchByKeyword(
+        scenes: List<GroupChatScene>,
+        text: String,
+        activeSceneId: String?,
+    ): GroupChatScene? {
+        val line = text.trim()
+        if (line.isEmpty()) return null
+        if (line.startsWith("/")) return null
+        val current = active(scenes, activeSceneId)
+        return scenes
+            .asSequence()
+            .filter { it.id != DEFAULT_SCENE_ID && it.id != current?.id }
+            .mapNotNull { scene ->
+                val hit = scene.keywords
+                    .asSequence()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() && line.contains(it, ignoreCase = true) }
+                    .maxOfOrNull { it.length }
+                if (hit == null) null else scene to hit
+            }
+            .maxByOrNull { it.second }
+            ?.first
+    }
 }

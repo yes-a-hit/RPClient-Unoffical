@@ -104,6 +104,79 @@ uiState.copy(...).setup()                     // 用的是几百毫秒前的快�
 
 Material3 里是 `ButtonDefaults.textButtonColors(...)`。项目里用过 `Icons.Rounded.*` 的大量图标，那些来自 `material-icons-extended`，与这个不是一回事。
 
+## 十五、资源字符串里的单引号
+
+**症状**：`mergeDebugResources FAILED`，报 `Failed to flatten XML for resource 'xxx' with error: Invalid unicode escape sequence in string`。整包构建停在这一步，Kotlin 一行都没编译。
+
+**根因**：aapt 把单引号当转义符的首字符。意大利语 `un'immagine`、法语 `l'appui` 这类天然带撇号的译文必然踩。
+
+**处置**：整段用 ASCII 双引号包住 —— `<string name="x">"Questa chat ha un'immagine propria"</string>`。批量插入 13 locale 时，脚本里对含 `'` 的值统一套一层双引号，别等编译报错再回头找。
+
+顺带一条：**值的正文里不要出现 ASCII 双引号**，那会破坏 XML 属性边界，落盘成嵌套未转义的引号，aapt 有时放行但语义不可控。
+
+## 十六、`internal fun` 不能写在 `private companion object` 里
+
+**症状**：`Unresolved reference 'xxx'`，明明就在同一个文件。
+
+**根因**：`private companion object` 把内部可见性压到 private，`internal fun` 在里面退化成不可见，文件外自然看不到。
+
+**处置**：要暴露给测试的辅助函数，companion object 写成普通的 `companion object`（可见性跟着类走），函数单独标 `internal`。
+
+## 十七、拆文件时 `private` 是文件级可见
+
+**症状**：把 `XxxLayout.kt` 里的一批 `@Composable` 搬到 `XxxViews.kt` 之后编译报
+`Cannot access 'fun AvatarPreview(...)': it is private in file.`——而这个函数明明还在同一个包里。
+
+**根因**：Kotlin 的 `private` 在**顶层声明**上是**文件级**，不是类级。同 package 的不同文件互相看不见 `private` 顶层声明。
+
+**处置**：拆出去的文件里，凡是原文件也要用到的顶层声明，把 `private` 改成 `internal`（模块级）。`tools/split_kt.py` 的 `relax_visibility()` 就是这么做的。
+
+配套两条：
+
+- 顶层**常量**（`private const val` / `private val`）同样受这条约束，最容易漏——`StoryEditorLayout` 那次漏了 7 个 `REASONING_SCROLL_BOTTOM_TOLERANCE_PX` 之类的常量，报了好几条 `Cannot access 'val X'`。
+- 反过来，**只被本文件用**的辅助函数留在原文件反而更好，改成 `internal` 会把模块内所有同名符号都暴露出去。
+
+## 十八、包内写全限定名会解析成相对路径
+
+**症状**：`RPClientApp.kt`（package 是 `me.kafuuneko.rpclient`）里写
+`singleOf(::me.kafuuneko.rpclient.feature.chat.logic.ChatRegexApplier)`
+报 `Unresolved reference 'me'` / `Unresolved reference 'kafuuneko'`。
+
+**根因**：Kotlin 解析不带前导 `::` 或 `import` 的全限定名时，会先当相对包名，从当前 package 往下找，于是拼成了 `me.kafuuneko.rpclient.me.kafuuneko…`。
+
+**处置**：老老实实加 `import`，然后写短名。Koin 的 `singleOf(::Xxx)` 尤其要注意——它内部是构造函数引用，不能被包名限定。
+
+## 十九、`FileRepository.saveFile(uri)` 返回的是 uuid 字符串
+
+**症状**：`mFileRepository.saveFile(uri)?.uuid` 报 `Cannot infer type for this parameter` / `Unresolved reference 'uuid'`。
+
+**根因**：`saveFile(Uri): String` 直接返回 uuid，不是 `FileEntity` 也不是可空对象，没有 `.uuid` 可点。
+
+**处置**：要 uuid 就直接用返回值；要处理失败包 `runCatching { withContext(Dispatchers.IO) { mFileRepository.saveFile(uri) } }.getOrNull()`。`ImageRequestException` 之类的异常不在函数签名里，`runCatching` 是必须的，否则选到一张坏图就整个 ViewModel 崩。
+
+## 二十、`bind` 出来的文案键和已有键撞名
+
+**症状**：给「全员」场景加副标题，写成 `group_chat_scene_all` —— 而这键早就存在，值是「全员」本身（按钮标题）。编译不报错，界面上副标题显示成重复的「全员」。
+
+**根因**：场景相关文案已有 `group_chat_scene_all`（标题）、`group_chat_scene_all_present`（在场说明）、`group_chat_scene_empty_hint`（空状态）。新增一条时凭语义猜名字，很容易撞上语义相近的老键。
+
+**处置**：加新键之前先 `Select-String -Pattern 'group_chat_scene_'` 把同前缀的键列出来，再决定名字（这次正解是 `group_chat_scene_all_subtitle`）。批量插 13 个 locale 的脚本要对已存在的键打 `SKIP` 而不是覆盖。
+
+## 二十一、新写的 UI 文案直接写中文
+
+**症状**：功能在中文下完全正常，切到其他语言时那几行还是中文；更糟的是**没人会发现**——因为开发机默认就是中文。
+
+**根因**：`Text("场景「" + name + "」")` 这种写法编译、运行、看起来都没问题。项目里 13 个 locale 是硬约束，但约束只在「加字符串资源」时生效，直接写字面量绕过了整个机制。
+
+**处置**：
+
+1. 写 `Text(...)` 之前先问一句「这句会不会被用户看到」，会就立刻 `stringResource`。
+2. 拼字符串（`"场景「" + name + "」"`）尤其危险，先把模板定成 `%1$s` 再填。
+3. 复查手段：`grep -n 'Text(\"' app/src/main/java/me/kafuuneko/rpclient/feature` ——命中的每一处都该有个理由（纯符号、调试信息）。
+4. 这一轮的实际案例：群聊场景提示带的四行（场景名 / 在场 / 世界书 / 悄悄走）全都是硬编码，从 v1.20 一直漏到 v1.24 才被发现，中间跨了四个版本没人注意。
+
 ## 最后核对
 
-随 `v1.13`（`dc52dfe0`）核对。新增条目请保持「症状 → 根因 → 处置」三段式，别只写一句「注意 XX」——那对下一次排查没有用。
+随 `v1.24` 核对（群聊场景改造轮）。新增条目请保持「症状 → 根因 → 处置」三段式，别只写一句「注意 XX」——那对下一次排查没有用。
+
+历史变更见 [CHANGELOG](../CHANGELOG.md)。

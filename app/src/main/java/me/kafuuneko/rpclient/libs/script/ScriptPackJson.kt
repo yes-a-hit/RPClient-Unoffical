@@ -30,8 +30,24 @@ internal object ScriptPackJson {
         backgroundKey = root.stringOr("backgroundKey"),
         showCompletion = root.boolOr("showCompletion", true),
         shareSettings = root.boolOr("shareSettings", false),
-        variables = root.arrayOr("variables").mapNotNull { toVariable(it) }
+        variables = root.arrayOr("variables").mapNotNull { toVariable(it) },
+        globalGuardRules = root.arrayOr("globalGuardRules").mapNotNull { toGuardRule(it) }
     )
+
+    /** 映射一条越界拦截规则；没写匹配片段就丢弃，写了也拦不到东西。 */
+    private fun toGuardRule(element: com.google.gson.JsonElement): ScriptGuardRule? {
+        val item = element.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        val pattern = item.stringOr("pattern")
+        if (pattern.isBlank()) return null
+        return ScriptGuardRule(
+            pattern = pattern,
+            regex = item.boolOr("regex", false),
+            description = item.stringOr("description"),
+            hardFail = item.boolOr("hardFail", false),
+            failSceneId = item.stringOr("failSceneId"),
+            retryHint = item.stringOr("retryHint")
+        )
+    }
 
     /** 映射一条开场白；内容为空时丢弃。 */
     private fun toOpening(element: com.google.gson.JsonElement): ScriptOpening? {
@@ -95,7 +111,8 @@ internal object ScriptPackJson {
             inheritBackground = item.boolOr("inheritBackground", true),
             suggestedActions = item.stringListOr("suggestedActions"),
             events = item.arrayOr("events").mapNotNull { toEvent(it) },
-            unlockCondition = item.objOrNull("unlockCondition")?.let(::toCondition)
+            unlockCondition = item.objOrNull("unlockCondition")?.let(::toCondition),
+            guardRules = item.arrayOr("guardRules").mapNotNull { toGuardRule(it) }
         )
     }
 

@@ -64,7 +64,14 @@ data class ScriptPack(
      * 玩家行为通过这些数值累积出后果，条件与事件按它们判定，
      * 是开放剧本与规则驱动玩法的地基。
      */
-    val variables: List<ScriptVariable> = emptyList()
+    val variables: List<ScriptVariable> = emptyList(),
+    /**
+     * 整局生效的越界拦截规则。
+     *
+     * 管那些「不管在哪一场都不许写出来」的东西，
+     * 场景级规则在后，两者合并后先命中先算。
+     */
+    val globalGuardRules: List<ScriptGuardRule> = emptyList()
 ) {
     companion object {
         /** 当前支持的剧本结构版本。 */
@@ -170,7 +177,14 @@ data class ScriptScene(
      * 只做本地匹配、不触发生成：同一场景反复进入都取同一张图，
      * 既不额外花钱，也不会每次换一张让人出戏。
      */
-    val backgroundKey: String = ""
+    val backgroundKey: String = "",
+    /**
+     * 本场的越界拦截规则。
+     *
+     * 与剧本级的那份合并生效，本场这份用来管「这一场绝不能出现什么」，
+     * 例如跳杀场景里玩偶不能被枪打死。
+     */
+    val guardRules: List<ScriptGuardRule> = emptyList()
 )
 
 /**
@@ -382,6 +396,47 @@ data class ScriptCondition(
     val failSceneId: String = "",
     /** 展示给用户的失败或通关说明。 */
     val description: String = ""
+)
+
+/**
+ * 越界拦截规则。
+ *
+ * 失败条件管的是「玩家输了」，它管的是「模型写飞了」——
+ * 保安一枪把不死玩偶崩了、角色凭空掏出一把剧本里没有的枪，
+ * 这类内容一旦落进对话就成了既定事实，后面的判定全部失去意义。
+ *
+ * 判定发生在回复落库之前：命中就把这轮作废，玩家看不到那段文字，
+ * 模型也拿不到它当上下文。要它直接算失败就打开 [hardFail]，
+ * 免得作者再写一条一模一样的失败条件。
+ */
+data class ScriptGuardRule(
+    /**
+     * 匹配片段。
+     *
+     * 与 [ScriptCondition.pattern] 同一套写法：[regex] 为假时用 `|`
+     * 分隔多个说法，为真时整段当正则。
+     */
+    val pattern: String = "",
+    /** 按正则匹配。 */
+    val regex: Boolean = false,
+    /**
+     * 命中后给玩家看的一句话。
+     *
+     * 留空会退化成「这一轮的内容超出了本场设定」，
+     * 所以能写就写清楚，玩家才知道自己刚才那句话把故事带到了哪。
+     */
+    val description: String = "",
+    /** 命中即判本场失败，而不是只作废这一轮。 */
+    val hardFail: Boolean = false,
+    /** [hardFail] 为真时转到的场景，留空则直接收官。 */
+    val failSceneId: String = "",
+    /**
+     * 提示模型重写时要绕开什么。
+     *
+     * 这段会跟着作废提示一起回灌给下一轮，
+     * 空着的话模型多半会原样再写一遍。
+     */
+    val retryHint: String = ""
 )
 
 /**

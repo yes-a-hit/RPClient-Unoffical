@@ -161,6 +161,15 @@ sealed class ChatUiIntent {
     /** 丢掉本会话的动作配置，恢复成跟随全局。 */
     data object ResetSessionPokeActions : ChatUiIntent()
 
+    /** 打开系统选图，挑一张作为本会话的聊天背景。 */
+    data object PickSessionBackground : ChatUiIntent()
+
+    /** 选图回来，携带本地可读的图片地址。 */
+    data class SessionBackgroundPicked(val uri: Uri) : ChatUiIntent()
+
+    /** 丢掉本会话的背景，恢复成跟全局一致。 */
+    data object ClearSessionBackground : ChatUiIntent()
+
     data class SaveUserName(val value: String) : ChatUiIntent()
 
     data class SaveUserDescription(val value: String) : ChatUiIntent()

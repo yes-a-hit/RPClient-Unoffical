@@ -7,6 +7,8 @@ package me.kafuuneko.rpclient.feature.groupchat.model
  * @property restrictMembers 是否限定了成员；false 表示全员都在。
  * @property lorebookEntryIds 本场限定的世界书条目；空表示沿用会话设置。
  * @property lorebookEntryCount 限定条目数，标签上直接显示「设定 2 条」。
+ * @property isSecret 这一场是悄悄去的；标签上要有区别，不然玩家分不清是公开走还是溜走。
+ * @property hasOwnBackground 这个场景单独挑了背景图。
  */
 data class GroupChatSceneItem(
     val id: String,
@@ -14,5 +16,7 @@ data class GroupChatSceneItem(
     val memberNames: List<String> = emptyList(),
     val restrictMembers: Boolean = false,
     val lorebookEntryIds: List<Long> = emptyList(),
-    val lorebookEntryCount: Int = lorebookEntryIds.size
+    val lorebookEntryCount: Int = lorebookEntryIds.size,
+    val isSecret: Boolean = false,
+    val hasOwnBackground: Boolean = false,
 )

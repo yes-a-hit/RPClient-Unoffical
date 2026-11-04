@@ -76,6 +76,37 @@ val firedEvents: Set<String>?
 - `showDashboard = true` 时才渲染 `dashboardItems`，用来显示电量、夜数这类玩家要盯着的东西。
 - `failText` + `timeoutSceneId` 组成本场超时/失败时的出口。`maxRounds` 到顶后返回 `ScriptPlayOutcome.Failed(reason = failText, gotoSceneId = timeoutSceneId)`，而不是继续傻跑。
 
+## 越界拦截
+
+失败条件管的是「玩家输了」，`ScriptGuardRule` 管的是「模型写飞了」。两者不是一回事：前者是规则内的结果，后者是规则外的内容。
+
+判定的对象是**模型这一轮的回复正文**，时机在落库之前：
+
+1. `ScriptPlayViewModel.onSend()` 拿到 `visibleReply`（已剥掉 `<<<OPTIONS` 块）
+2. `ScriptPlayGuard.evaluate(pack.globalGuardRules + scene.guardRules, visibleReply)`
+3. 命中 `Hit.Soft` → 那段回复**不进消息列表**，只追加一条 `SYSTEM` 提示，`roundCount` 不累加，直接 `return`（不跑判定、不跑场景事件、不自动推进）
+4. 命中 `Hit.Hard` → 同上加提示，再按 `rule.failSceneId` 转惩罚场景或直接收官
+
+为什么要卡在落库之前：一旦进了消息列表就是既定事实，后面的失败条件、通关条件、以及下一轮的历史全都在拿一段不该发生的故事做输入。事后判失败只是「承认这段真的发生了」，玩家看到的还是那段离谱内容。
+
+规则字段（`ScriptGuardRule`）：
+
+| 字段 | 作用 |
+| --- | --- |
+| `pattern` | `regex = false` 时用 `\|` 分隔多个说法；为真时整段当正则 |
+| `description` | 命中后给玩家看的一句话；留空退化成「这一轮的内容超出了本场设定」 |
+| `hardFail` | 命中即判本场失败，而不是只作废这一轮 |
+| `failSceneId` | `hardFail` 时的去处；留空直接收官 |
+| `retryHint` | 跟着作废提示回灌给下一轮。不写的话模型多半原样再写一遍 |
+
+正则写坏按「不命中」处理——一条规则写错不该让整局玩不下去，也不该反过来把所有回复都判成越界。
+
+提示词里也会带一份禁区清单（`ScriptPlayGuard.promptSection()`，渲染成【禁止描写】段）。拦截是兜底，能不让模型写出来最好：写出来再作废，玩家会看到一句话然后它消失。
+
+写法示例（`samples/demo-three-nights.json` 的 `jumpscare_foxy`）：禁止「打死/崩了/杀掉」，命中只作废该轮；禁止「诈尸/又站了起来」，命中直接判失败。
+
+**只有配置了规则才生效**，没有默认兜底——自动猜边界会把正常剧情也拦掉。
+
 ## 这条线上的历史教训
 
 剧本引擎是本地最能暴露「状态放错层」的地方。踩过的具体坑：
@@ -86,4 +117,6 @@ val firedEvents: Set<String>?
 
 ## 最后核对
 
-随 `v1.13`（`dc52dfe0`）核对：`libs/script` 9 文件、`libs/story` 13 文件、`ScriptPlaySnapshot` 四字段齐全、`ScriptVariable.resetOnRestart` 默认 true。
+随 `v1.24` 核对：`libs/script` 10 文件、`libs/story` 13 文件、`ScriptPlaySnapshot` 四字段齐全、`ScriptVariable.resetOnRestart` 默认 true、`ScriptGuardRule` 六个字段 + `ScriptPlayGuardTest` 13 条用例。
+
+历史变更见 [CHANGELOG](../CHANGELOG.md)。

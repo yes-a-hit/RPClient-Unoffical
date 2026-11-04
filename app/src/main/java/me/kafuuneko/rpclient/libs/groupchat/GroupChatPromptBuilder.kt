@@ -865,6 +865,22 @@ class GroupChatPromptBuilder(
         if (scene.restrictsLorebook) {
             builder.append("\n【本场设定】只使用与本场相关的设定条目，其他地点的设定此时不适用。")
         }
+        if (scene.visibility == me.kafuuneko.rpclient.libs.groupchat.model.SceneVisibility.Secret) {
+            // 隐蔽场景的价值全在「没跟来的人不知道」，不写这句模型会当成普通换房间
+            builder.append("\n【这次是私下前往】")
+            builder.append(
+                "\n你们是避开其他人过来的，没跟过来的人此刻并不知道你们在这里、" +
+                    "也不知道你们在做什么。不要让他们中出现「撞见」「听说」这类反应，" +
+                    "也不要让在场的角色主动把这事说出去。"
+            )
+        }
+        builder.append("\n【位置变化】")
+        builder.append(
+            "\n最近的旁白如果交代了这一场是怎么来的（谁跟着你走、谁被留在原处），" +
+                "在场角色应当对此有反应：跟着来的人可以追问、抱怨或调侃你的选择；" +
+                "被留在原处的人此时不在场，但可以在下一轮回到他们时表现出被撇下的情绪，例如吃醋、试探或不满。" +
+                "不要无视位置变化直接接话。"
+        )
         if (scene.entryPrompt.isNotBlank()) {
             builder.append('\n').append(scene.entryPrompt.trim())
         }

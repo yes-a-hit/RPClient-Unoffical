@@ -25,7 +25,23 @@ data class GroupChatScene(
      * 和 [characterIds] 一样是「收窄」而不是「替换」：配了才生效，
      * 没配过的旧场景一个字节都不用改，行为跟以前一模一样。
      */
-    val lorebookEntryIds: List<Long> = emptyList()
+    val lorebookEntryIds: List<Long> = emptyList(),
+    /**
+     * 这次移动别人看不看得见。
+     *
+     * 公开走＝谁走了大家都清楚，留下的人会追问；
+     * 悄悄走＝只有跟着走的人知道，留下的那些人此刻还蒙在鼓里。
+     */
+    val visibility: SceneVisibility = SceneVisibility.Open,
+    /** 本场专用背景图（文件 uuid）；空表示沿用会话背景。 */
+    val backgroundUuid: String = "",
+    /**
+     * 命中这些词就认为玩家在往这里走。
+     *
+     * 只在「实验性模块 → 关键字换场」打开时生效。默认关闭，因为误判代价很高：
+     * 角色说一句「厨房里好像有动静」不该把整场搬去厨房。
+     */
+    val keywords: List<String> = emptyList(),
 ) {
     /** 本场是否限定了具体成员。 */
     val restrictsMembers: Boolean
@@ -34,6 +50,25 @@ data class GroupChatScene(
     /** 本场是否限定了世界书条目。 */
     val restrictsLorebook: Boolean
         get() = lorebookEntryIds.isNotEmpty()
+}
+
+/**
+ * 场景切换的可见性。
+ *
+ * 只有两态：别人看得见，和别人看不见。中间状态（「有人看见了有人没看见」）
+ * 交给模型按人物关系自己编，不做成开关——那样配置成本会超过收益。
+ */
+enum class SceneVisibility {
+    /** 公开：离开与同行都是明面上的事。 */
+    Open,
+
+    /** 隐蔽：绕开众人视线离开，在场的人事后才察觉。 */
+    Secret;
+
+    companion object {
+        fun fromName(raw: String?): SceneVisibility =
+            entries.firstOrNull { it.name.equals(raw?.trim(), ignoreCase = true) } ?: Open
+    }
 }
 
 /**

@@ -78,6 +78,14 @@ class MainActivity : CoreActivityWithEvent() {
         uri?.let { mViewModel.emit(MainUiIntent.SkillFolderPicked(it)) }
     }
 
+    /** 范本另存为：用 CreateDocument 让用户挑位置和文件名，文件名只是建议值。 */
+    private val mSampleDocumentCreator = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri ?: return@registerForActivityResult
+        mViewModel.emit(MainUiIntent.ExportSampleDocumentResult(uri))
+    }
+
     override fun getViewEventFlow() = mViewModel.viewEventFlow
 
     @Composable
@@ -127,6 +135,9 @@ class MainActivity : CoreActivityWithEvent() {
             )
 
             MainViewEvent.OpenSkillFolderPicker -> mSkillFolderPicker.launch(null)
+
+            is MainViewEvent.CreateSampleDocument ->
+                mSampleDocumentCreator.launch(viewEvent.suggestedName)
 
             is MainViewEvent.ShowSkillImportResult -> Toast.makeText(
                 this,

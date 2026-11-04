@@ -49,7 +49,9 @@ sealed class ChatUiState {
         /** 本会话是否在用自己那份动作（false 表示跟随全局）。 */
         val usesOwnPokeActions: Boolean = false,
         /** 聊天页背景配置，由全局偏好解析出的已解码位图。 */
-        val backgroundState: ChatBackgroundUiState = ChatBackgroundUiState()
+        val backgroundState: ChatBackgroundUiState = ChatBackgroundUiState(),
+        /** 本会话是否自己设过背景（false 表示跟随全局设置）。 */
+        val hasOwnBackground: Boolean = false
     ) : ChatUiState()
 
     data class Finished(val previous: ChatUiState) : ChatUiState()

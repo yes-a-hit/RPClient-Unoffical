@@ -401,6 +401,22 @@ Treat it as an instruction, not as manuscript text. Do not quote, repeat, explai
      */
     var pokeActions by stringPref(default = "")
 
+    /**
+     * 已打开的实验性功能，逗号分隔的 [ExperimentalFeature.key]。
+     *
+     * 只存打开的那几个：默认全关，没写过的旧安装就是空串。
+     * 存 key 不存 ordinal，重排枚举不会让用户的开关错位。
+     */
+    var experimentalFeatures by stringPref(default = "")
+
+    /**
+     * 上次看到更新摘要的那个版本号。
+     *
+     * 和 [UV_VERSION] 不一致就在首页弹一次摘要——只弹一次，
+     * 关掉之后不再打扰；没写过的旧安装是空串，会正常弹。
+     */
+    var lastSeenReleaseNotesVersion by stringPref(default = "")
+
     // 摘要目标字数限制，对应摘要提示词中的 {{words}}。
     var summaryWordsLimit by intPref(default = 500)
 

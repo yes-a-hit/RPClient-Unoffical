@@ -50,6 +50,8 @@ sealed class GroupChatUiState {
         val dialogState: GroupChatDialogState = GroupChatDialogState.None,
         /** 聊天页背景配置，与单聊共用同一份全局背景设置。 */
         val backgroundState: ChatBackgroundUiState = ChatBackgroundUiState(),
+        /** 本群聊是否自己设过背景（false 表示跟随全局设置）。 */
+        val hasOwnBackground: Boolean = false,
         /** 当前会话可切换的场景列表；空表示这个群没配场景。 */
         val scenes: List<GroupChatSceneItem> = emptyList(),
         /** 当前生效的场景 ID；空表示不限场景，全员在场。 */
@@ -211,7 +213,12 @@ sealed class GroupChatDialogState {
          * 与 [memberIds] 的约定保持一致，否则一个没配过的场景
          * 会顺手把整本书关掉。
          */
-        val lorebookEntryIds: Set<Long> = emptySet()
+        val lorebookEntryIds: Set<Long> = emptySet(),
+        /** 这次移动别人看不看得见。 */
+        val visibility: me.kafuuneko.rpclient.libs.groupchat.model.SceneVisibility =
+            me.kafuuneko.rpclient.libs.groupchat.model.SceneVisibility.Open,
+        /** 本场专用背景图（文件 uuid）；空表示沿用会话背景。 */
+        val backgroundUuid: String = "",
     ) : GroupChatDialogState()
 }
 

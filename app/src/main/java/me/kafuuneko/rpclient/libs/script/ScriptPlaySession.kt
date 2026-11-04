@@ -264,7 +264,14 @@ object ScriptPlayPromptBuilder {
          * 只给名字模型只会写旁白，不知道这个人是什么性格、怎么说话；
          * 把角色卡里的设定带进来，角色才真的参与对话。
          */
-        castProfiles: Map<String, String> = emptyMap()
+        castProfiles: Map<String, String> = emptyMap(),
+        /**
+         * 本场的越界拦截规则。
+         *
+         * 只是「让它别写」，真正的拦截在 [ScriptPlayGuard] 那边做：
+         * 提示词管得住大部分情况，管不住的那个能兜住。
+         */
+        guardRules: List<ScriptGuardRule> = emptyList()
     ): String {
         val builder = StringBuilder()
         builder.append("你正在主持一场角色扮演剧本《").append(pack.name).append("》。\n")
@@ -399,6 +406,8 @@ object ScriptPlayPromptBuilder {
             builder.append(scene.bannedCast.joinToString("、"))
             builder.append("：这些角色不得在任何回复中出现。\n")
         }
+        // 越界禁区放在开场之前：先立规矩，再演内容
+        ScriptPlayGuard.promptSection(guardRules)?.let(builder::append)
         if (scene.entryPrompt.isNotBlank()) {
             builder.append("\n【本场开场】").append(scene.entryPrompt).append('\n')
         }

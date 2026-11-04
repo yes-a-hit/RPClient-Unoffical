@@ -41,6 +41,14 @@ sealed class ScriptPlayUiState {
         val statusItems: List<ScriptStatusItem> = emptyList(),
         /** 剧本是否开启状态面板；关掉时整块不显示。 */
         val showDashboard: Boolean = true,
+
+        /**
+         * 状态面板是否展开。
+         *
+         * 默认折叠：面板一摊开就是七八行，手机键盘弹起后
+         * 留给对话框的高度还不如状态条高，输入框直接被压成一条缝。
+         */
+        val dashboardExpanded: Boolean = false,
         /** 对话历史。 */
         val messages: List<ScriptPlayMessage> = emptyList(),
         /** 输入框内容。 */
@@ -132,6 +140,9 @@ sealed class ScriptPlayUiIntent {
 
     /** 切换某个角色的禁言状态。 */
     data class ToggleMute(val name: String) : ScriptPlayUiIntent()
+
+    /** 展开 / 收起状态面板。 */
+    data object ToggleDashboard : ScriptPlayUiIntent()
 
     /** 指定下一轮必须发言的角色；再点一次取消。 */
     data class ForceSpeaker(val name: String) : ScriptPlayUiIntent()

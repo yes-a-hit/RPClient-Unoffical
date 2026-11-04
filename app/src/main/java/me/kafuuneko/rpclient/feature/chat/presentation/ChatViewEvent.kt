@@ -9,6 +9,9 @@ sealed class ChatViewEvent : IViewEvent {
 
     data object OpenFilePicker : ChatViewEvent()
 
+    /** 打开系统选图，只挑一张作为本会话的背景。 */
+    data object PickBackgroundImage : ChatViewEvent()
+
     /** 使用原图真实类型与扩展名创建保存目标。 */
     data class SaveImage(val metadata: ImageExportMetadata) : ChatViewEvent()
 

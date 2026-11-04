@@ -39,7 +39,24 @@ data class MainSettingsState(
     val skillState: MainSkillSettingsState = MainSkillSettingsState(),
 
     /** 全局动作表（戳一戳、摸头、捏脸……），单人会话可以在此基础上另存一套。 */
-    val pokeActionState: MainPokeActionState = MainPokeActionState()
+    val pokeActionState: MainPokeActionState = MainPokeActionState(),
+
+    /** 实验性模块：默认全关，打开的那几个单独存。 */
+    val experimentalState: MainExperimentalState = MainExperimentalState()
+)
+
+/**
+ * 实验性模块面板的状态。
+ *
+ * 只放「哪些开着」和「其中几个是高危」两件事：具体有哪些功能由
+ * [me.kafuuneko.rpclient.libs.experimental.ExperimentalFeature] 枚举决定，
+ * UI 状态里不再抄一份清单，避免加一个功能要改三个地方。
+ */
+data class MainExperimentalState(
+    /** 当前打开的 key 集合。 */
+    val enabledKeys: Set<String> = emptySet(),
+    /** 其中风险等级为 High 的数量，用于面板顶部的提醒。 */
+    val highRiskCount: Int = 0
 )
 
 /**
@@ -319,6 +336,9 @@ internal fun SummaryInjectionPosition.toMainSummaryInjectionState(
 sealed class MainChatDataManagementState {
     data object Idle : MainChatDataManagementState()
     data object Reading : MainChatDataManagementState()
+
+    /** 正在写范本。和 Reading 分开：两个入口同时点，只有各自那条在转。 */
+    data object Exporting : MainChatDataManagementState()
 }
 
 /** Debug 设置面板状态。 */

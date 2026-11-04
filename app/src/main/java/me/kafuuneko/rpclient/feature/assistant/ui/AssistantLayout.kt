@@ -1,5 +1,4 @@
 package me.kafuuneko.rpclient.feature.assistant.ui
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -80,12 +79,6 @@ import me.kafuuneko.rpclient.feature.assistant.presentation.AssistantRole
 import me.kafuuneko.rpclient.feature.assistant.presentation.AssistantUiIntent
 import me.kafuuneko.rpclient.feature.assistant.presentation.AssistantUiState
 
-/**
- * 助手页面布局。
- *
- * 页面分三段：顶部状态条显示提示词来源与沙箱占用，中部是消息流，
- * 底部是输入区。工具结果以独立卡片呈现，避免和自然语言回复混在一起。
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssistantLayout(
@@ -177,8 +170,9 @@ fun AssistantLayout(
 }
 
 /** 顶部状态条：提示词来源与沙箱占用。 */
+
 @Composable
-private fun AssistantStatusBar(state: AssistantUiState.Ready) {
+internal fun AssistantStatusBar(state: AssistantUiState.Ready) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth()
@@ -201,8 +195,9 @@ private fun AssistantStatusBar(state: AssistantUiState.Ready) {
 }
 
 /** 消息流：包含历史、工具卡片与正在流式输出的草稿。 */
+
 @Composable
-private fun AssistantMessageList(
+internal fun AssistantMessageList(
     items: List<AssistantMessageItem>,
     streaming: String,
     isGenerating: Boolean,
@@ -273,8 +268,9 @@ private fun AssistantMessageList(
 }
 
 /** 单条消息气泡；工具结果使用等宽小字卡片。 */
+
 @Composable
-private fun AssistantMessageBubble(item: AssistantMessageItem) {
+internal fun AssistantMessageBubble(item: AssistantMessageItem) {
     val isUser = item.role == AssistantRole.User
     val isTool = item.role == AssistantRole.Tool
     Row(
@@ -399,8 +395,9 @@ private fun AssistantMessageBubble(item: AssistantMessageItem) {
 }
 
 /** 底部输入区：发送与停止共用同一个位置。 */
+
 @Composable
-private fun AssistantInputBar(
+internal fun AssistantInputBar(
     state: AssistantUiState.Ready,
     emit: AssistantUiIntent.() -> Unit
 ) {
@@ -472,8 +469,9 @@ private fun AssistantInputBar(
 }
 
 /** 提示词设置弹窗：继承全局提示词或使用独立提示词。 */
+
 @Composable
-private fun AssistantPromptEditor(
+internal fun AssistantPromptEditor(
     state: AssistantUiState.Ready,
     emit: AssistantUiIntent.() -> Unit
 ) {
@@ -536,385 +534,3 @@ private fun AssistantPromptEditor(
  * 图片显示缩略图、文本显示类型图标与体积，点卡片可预览内容，
  * 右上角叉号移除——对齐常见聊天客户端的附件呈现方式。
  */
-@Composable
-private fun AttachmentTray(
-    attachments: List<AssistantAttachment>,
-    emit: AssistantUiIntent.() -> Unit
-) {
-    var previewTarget by remember { mutableStateOf<AssistantAttachment?>(null) }
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(attachments, key = { it.uri }) { attachment ->
-            AttachmentCard(
-                attachment = attachment,
-                onPreview = { previewTarget = attachment },
-                onRemove = { AssistantUiIntent.RemoveAttachment(attachment.uri).emit() }
-            )
-        }
-    }
-    previewTarget?.let { target ->
-        AttachmentPreviewDialog(target) { previewTarget = null }
-    }
-}
-
-/** 单个附件卡片：图片走缩略图，文本走图标。 */
-@Composable
-private fun AttachmentCard(
-    attachment: AssistantAttachment,
-    onPreview: () -> Unit,
-    onRemove: () -> Unit
-) {
-    Box(modifier = Modifier.width(96.dp)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onPreview)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(10.dp)
-                )
-                .padding(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center
-            ) {
-                if (attachment.isImage) {
-                    AttachmentThumbnail(attachment.uri)
-                } else {
-                    Icon(
-                        imageVector = Icons.Rounded.Description,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Text(
-                text = attachment.name,
-                modifier = Modifier.padding(top = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = formatSize(attachment.byteCount),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier.align(Alignment.TopEnd).size(20.dp)
-        ) {
-            Icon(
-                Icons.Rounded.Close,
-                contentDescription = stringResource(R.string.assistant_send),
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.error
-            )
-        }
-    }
-}
-
-/** 图片缩略图：按目标尺寸采样解码，避免大图占内存。 */
-@Composable
-private fun AttachmentThumbnail(uri: String) {
-    val context = LocalContext.current
-    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, uri) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val parsed = android.net.Uri.parse(uri)
-                val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                context.contentResolver.openInputStream(parsed)?.use {
-                    android.graphics.BitmapFactory.decodeStream(it, null, options)
-                }
-                // 按最长边 256 采样，卡片只有 64dp 高
-                var sample = 1
-                val longest = maxOf(options.outWidth, options.outHeight)
-                while (longest / sample > 256) sample *= 2
-                val decodeOptions = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
-                val bitmap = context.contentResolver.openInputStream(parsed)?.use {
-                    android.graphics.BitmapFactory.decodeStream(it, null, decodeOptions)
-                }
-                bitmap?.asImageBitmap()
-            }.getOrNull()
-        }
-    }
-    bitmap?.let {
-        Image(
-            bitmap = it,
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-    }
-}
-
-/** 预览对话框：图片铺满，文本显示前若干行。 */
-@Composable
-private fun AttachmentPreviewDialog(
-    attachment: AssistantAttachment,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(attachment.name) },
-        text = {
-            if (attachment.isImage) {
-                val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, attachment.uri) {
-                    value = withContext(Dispatchers.IO) {
-                        runCatching {
-                            val parsed = android.net.Uri.parse(attachment.uri)
-                            val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
-                            context.contentResolver.openInputStream(parsed)?.use {
-                                android.graphics.BitmapFactory.decodeStream(it, null, options)?.asImageBitmap()
-                            }
-                        }.getOrNull()
-                    }
-                }
-                bitmap?.let {
-                    Image(
-                        bitmap = it,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentScale = ContentScale.Fit
-                    )
-                } ?: Text(stringResource(R.string.assistant_attach_file))
-            } else {
-                val text by produceState("", attachment.uri) {
-                    value = withContext(Dispatchers.IO) {
-                        runCatching {
-                            context.contentResolver.openInputStream(android.net.Uri.parse(attachment.uri))
-                                ?.bufferedReader()?.use { reader -> reader.readText().take(4000) }
-                        }.getOrNull().orEmpty()
-                    }
-                }
-                Text(text = text, style = MaterialTheme.typography.bodySmall)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.script_picker_done))
-            }
-        }
-    )
-}
-
-/** 人类可读的体积。 */
-private fun formatSize(bytes: Long): String = when {
-    bytes <= 0L -> ""
-    bytes < 1024 -> "$bytes B"
-    bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-    else -> String.format("%.1f MB", bytes / 1024.0 / 1024.0)
-}
-
-/**
- * 会话列表对话框。
- *
- * 展示全部会话与消息条数，可新建、切换、归档与删除；
- * 顶部标注当前占用额度，超限时由存储层自动归档最旧的会话。
- */
-@Composable
-private fun SessionListDialog(
-    state: AssistantUiState.Ready,
-    emit: AssistantUiIntent.() -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = { AssistantUiIntent.CloseSessionList.emit() },
-        title = {
-            Text(
-                text = stringResource(R.string.assistant_sessions) + " " +
-                    stringResource(R.string.assistant_session_count, state.sessions.count { !it.archived })
-            )
-        },
-        text = {
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(state.sessions, key = { it.id }) { session ->
-                    val current = session.id == state.currentSessionId
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { AssistantUiIntent.SwitchSession(session.id).emit() }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = session.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (session.archived) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                }
-                            )
-                            Text(
-                                text = stringResource(R.string.assistant_session_meta, session.messageCount),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (!session.archived) {
-                            IconButton(
-                                onClick = { AssistantUiIntent.ArchiveSession(session.id).emit() },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Archive,
-                                    contentDescription = stringResource(R.string.assistant_session_archive),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                        IconButton(
-                            onClick = { AssistantUiIntent.DeleteSession(session.id).emit() },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Rounded.Delete,
-                                contentDescription = stringResource(R.string.assistant_session_delete),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { AssistantUiIntent.NewSession.emit() }) {
-                Text(stringResource(R.string.assistant_session_new))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = { AssistantUiIntent.CloseSessionList.emit() }) {
-                Text(stringResource(R.string.script_picker_done))
-            }
-        }
-    )
-}
-
-
-/** 沙箱浏览器：列出文件，可删除；文本可长按查看内容。 */
-@Composable
-private fun SandboxBrowserDialog(
-    state: AssistantUiState.Ready,
-    emit: AssistantUiIntent.() -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = { AssistantUiIntent.CloseSandboxBrowser.emit() },
-        title = { Text(stringResource(R.string.assistant_sandbox)) },
-        text = {
-            if (state.sandboxFiles.isEmpty()) {
-                Text(stringResource(R.string.assistant_sandbox_empty))
-            } else {
-                LazyColumn {
-                    items(state.sandboxFiles) { file ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Rounded.Description,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(start = 8.dp)
-                            ) {
-                                Text(
-                                    text = file.path,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = formatSize(file.size),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    AssistantUiIntent.ExportSandboxFile(file.path).emit()
-                                }
-                            ) {
-                                Icon(
-                                    Icons.Rounded.SaveAlt,
-                                    contentDescription = "导出",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    AssistantUiIntent.DeleteSandboxFile(file.path).emit()
-                                }
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Delete,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { AssistantUiIntent.CloseSandboxBrowser.emit() }) {
-                Text(stringResource(R.string.script_picker_done))
-            }
-        }
-    )
-}
-
-/** 模型发图时写在正文里的标记。 */
-private val IMAGE_MARKER = Regex("<image\\s+uuid=\"([^\"]+)\"[^>]*/?>")
-
-/** 消息里的图片：按 UUID 从文件库取样加载。 */
-@Composable
-private fun MessageImage(uuid: String) {
-    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, uuid) {
-        val loaded: androidx.compose.ui.graphics.ImageBitmap? = withContext(Dispatchers.IO) {
-            runCatching {
-                val repository = org.koin.core.context.GlobalContext.get()
-                    .get<me.kafuuneko.rpclient.libs.room.repository.FileRepository>()
-                repository.loadSampledBitmap(uuid, 720, 720)?.asImageBitmap()
-            }.getOrNull()
-        }
-        value = loaded
-    }
-    val image = bitmap
-    if (image != null) {
-        Image(
-            bitmap = image,
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp)),
-            contentScale = ContentScale.Crop
-        )
-    } else {
-        Text(
-            text = "（图片加载失败）",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-

@@ -9,11 +9,11 @@
 链式关系（`app/build.gradle.kts`）：
 
 ```
-gradle.properties: uv.version=1.13
-  ├─ uvNumeric = 1.13 去掉非数字 → 113
-  ├─ versionCode = 20260301 + 113 = 20260414
-  ├─ versionName = "2026.3.1-uv1.13-dev"
-  └─ buildConfigField UV_VERSION = "1.13"
+gradle.properties: uv.version=1.24
+  ├─ uvNumeric = 1.24 去掉非数字 → 124
+  ├─ versionCode = 20260301 + 124 = 20260425
+  ├─ versionName = "2026.3.1-uv1.24-dev"
+  └─ buildConfigField UV_VERSION = "1.24"
 ```
 
 改版本只改 `uv.version` 一处。曾经有人（我）在 `AppModel.kt` 写死 `const val UV_VERSION = "0.89"`，结果发布脚本按字面量抓、抓到就再也抓不到，静默失败了十几个版本。
@@ -71,4 +71,6 @@ python tools\count_tests.py     # 解析 test-results/*.xml，输出 tests=N fai
 
 ## 最后核对
 
-随 `v1.13`（`dc52dfe0`）核对：`uv.version=1.13`、`applicationId = me.kafuuneko.rpclient.uv`、`app/uv-debug.jks` 在库、`tools/publish-apk.ps1` 与 `tools/count_tests.py` 均在。
+随 `v1.24` 核对：`uv.version=1.24`、`applicationId = me.kafuuneko.rpclient.uv`、`app/uv-debug.jks` 在库、`tools/publish-apk.ps1` 与 `tools/count_tests.py`、`tools/split_kt.py`、`tools/list_toplevel.py` 均在。
+
+历史变更见 [CHANGELOG](../CHANGELOG.md)。

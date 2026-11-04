@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -44,13 +45,16 @@ import me.kafuuneko.rpclient.ui.widgets.RpLazyColumn
 import me.kafuuneko.rpclient.ui.widgets.RpSettingsGroup
 import me.kafuuneko.rpclient.ui.widgets.RpSettingsTile
 
-/** 设置页中的对话文件导入入口。 */
+/** 设置页中的对话文件导入与范本导出入口。 */
 @Composable
 internal fun ChatDataManagementPanel(
     state: MainChatDataManagementState,
     emit: MainUiIntent.() -> Unit
 ) {
     val isReading = state == MainChatDataManagementState.Reading
+    val isExporting = state == MainChatDataManagementState.Exporting
+    // 两个入口共用一个忙标记：导入读到一半时导出会把同一份状态搅乱
+    val isBusy = isReading || isExporting
     RpSettingsGroup {
         RpSettingsTile(
             icon = Icons.Rounded.FileDownload,
@@ -60,10 +64,37 @@ internal fun ChatDataManagementPanel(
             } else {
                 stringResource(R.string.import_chat_desc)
             },
-            enabled = !isReading,
+            enabled = !isBusy,
             onClick = { MainUiIntent.ImportChatClick.emit() },
             trailing = {
                 if (isReading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.50f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        )
+        RpSettingsTile(
+            icon = Icons.Rounded.FileUpload,
+            title = stringResource(R.string.export_sample),
+            subtitle = if (isExporting) {
+                stringResource(R.string.exporting_sample)
+            } else {
+                stringResource(R.string.export_sample_desc)
+            },
+            enabled = !isBusy,
+            onClick = { MainUiIntent.ExportSampleDocumentClick.emit() },
+            trailing = {
+                if (isExporting) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,

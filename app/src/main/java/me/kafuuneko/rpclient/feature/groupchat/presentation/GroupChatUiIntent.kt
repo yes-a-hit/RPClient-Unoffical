@@ -154,8 +154,31 @@ sealed class GroupChatUiIntent {
 
     /** 切换某条世界书条目是否属于本场；空集合代表不限制。 */
     data class ToggleSceneEditorLorebookEntry(val entryId: Long) : GroupChatUiIntent()
+
+    /** 改本次移动别人看不看得见。 */
+    data class ChangeSceneEditorVisibility(
+        val value: me.kafuuneko.rpclient.libs.groupchat.model.SceneVisibility
+    ) : GroupChatUiIntent()
+
+    /** 给这个场景单独挑一张背景图。 */
+    data object PickSceneBackground : GroupChatUiIntent()
+
+    /** 场景背景图选好了。 */
+    data class SceneBackgroundPicked(val uri: android.net.Uri) : GroupChatUiIntent()
+
+    /** 清掉场景自己的背景，回落到会话背景。 */
+    data object ClearSceneBackground : GroupChatUiIntent()
     data object SaveSceneEditor : GroupChatUiIntent()
     data class DeleteScene(val sceneId: String) : GroupChatUiIntent()
+
+    /** 打开系统选图，挑一张作为本群聊的背景。 */
+    data object PickSessionBackground : GroupChatUiIntent()
+
+    /** 选图回来，携带本地可读的图片地址。 */
+    data class SessionBackgroundPicked(val uri: android.net.Uri) : GroupChatUiIntent()
+
+    /** 丢掉本群聊的背景，恢复成跟全局一致。 */
+    data object ClearSessionBackground : GroupChatUiIntent()
 
     data object OpenProviderSettings : GroupChatUiIntent()
     data object DismissDialog : GroupChatUiIntent()

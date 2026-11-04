@@ -53,6 +53,14 @@ internal fun MainUiState.Normal.canOpenDialog(): Boolean {
 sealed class MainDialogState {
     data object None : MainDialogState()
 
+    /**
+     * 这个版本第一次打开时弹出的更新摘要。
+     *
+     * 只有 [version] 带过来：正文走资源文件，跟着界面语言走，
+     * 免得在状态里塞一坨已经排好版的多语言文本。
+     */
+    data class ReleaseNotes(val version: String) : MainDialogState()
+
     /** 编辑性别；留空表示不注入。 */
     data class EditUserGender(val draftText: String) : MainDialogState()
 

@@ -12,6 +12,9 @@ sealed class MainViewEvent : IViewEvent {
     data object OpenChatImporter : MainViewEvent()
     data object OpenChatImageDirectory : MainViewEvent()
 
+    /** 打开「另存为」，让用户挑范本落盘的位置。 */
+    data class CreateSampleDocument(val suggestedName: String) : MainViewEvent()
+
     /** 打开 Skill 文件选择器（可多选）。 */
     data object OpenSkillFilePicker : MainViewEvent()
 

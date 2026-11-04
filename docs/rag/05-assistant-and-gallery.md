@@ -75,4 +75,6 @@ GIF 早期「只能看首帧」。根因不在抽帧代码，而在入库时被�
 
 ## 最后核对
 
-随 `v1.13`（`dc52dfe0`）核对：`libs/assistant` 5 文件、`libs/gallery` 2 文件、`GalleryImage` 十一个字段、外观图上限 3。
+随 `v1.24` 核对：`libs/assistant` 5 文件、`libs/gallery` 2 文件、`GalleryImage` 十一个字段、外观图上限 3。
+
+历史变更见 [CHANGELOG](../CHANGELOG.md)。

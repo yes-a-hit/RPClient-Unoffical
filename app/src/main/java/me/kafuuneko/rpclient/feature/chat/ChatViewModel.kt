@@ -80,6 +80,8 @@ import me.kafuuneko.rpclient.libs.media.MessageImageAction
 import me.kafuuneko.rpclient.libs.media.MessageImageCoordinator
 import me.kafuuneko.rpclient.libs.media.MessageImageRuntime
 import me.kafuuneko.rpclient.libs.media.PickedFileReader
+import me.kafuuneko.rpclient.libs.room.entity.PageBackgroundEntity
+import me.kafuuneko.rpclient.libs.room.repository.PageBackgroundRepository
 import me.kafuuneko.rpclient.libs.prompt.ChatPromptBuilder
 import me.kafuuneko.rpclient.libs.prompt.INITIAL_SUMMARY_CANDIDATE_WINDOW_SIZE
 import me.kafuuneko.rpclient.libs.prompt.SummaryPromptBuilder
@@ -92,6 +94,7 @@ import me.kafuuneko.rpclient.libs.poke.PokeAction
 import me.kafuuneko.rpclient.libs.poke.PokeActions
 import me.kafuuneko.rpclient.libs.prompt.summaryCandidateMessageLimit
 import me.kafuuneko.rpclient.libs.prompt.summarySafeContent
+import me.kafuuneko.rpclient.feature.chat.logic.ChatRegexApplier
 import me.kafuuneko.rpclient.libs.regex.RegexMessageProcessor
 import me.kafuuneko.rpclient.libs.regex.RegexMessageSource
 import me.kafuuneko.rpclient.libs.regex.RegexScriptRepository
@@ -361,6 +364,9 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
      */
     private val mFileReader by inject<PickedFileReader>()
 
+    /** 会话级背景：按 chat:&lt;sessionId&gt; 存一张图，没设过就回落全局。 */
+    private val mPageBackgroundRepository by inject<PageBackgroundRepository>()
+
     private val mChatRepository by inject<ChatRepository>()
     private val mCharacterRepository by inject<CharacterRepository>()
     private val mLorebookRepository by inject<LorebookRepository>()
@@ -378,6 +384,7 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
     private val mSummaryPromptBuilder by inject<SummaryPromptBuilder>()
     private val mRegexRepository by inject<RegexScriptRepository>()
     private val mRegexProcessor by inject<RegexMessageProcessor>()
+    private val mRegexApplier by inject<ChatRegexApplier>()
     private val mChatArchiveRepository by inject<ChatArchiveRepository>()
     private val mImageGenRepository by inject<ImageGenRepository>()
     private val mSkillRepository by inject<SkillRepository>()
@@ -725,6 +732,51 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         mChatRepository.updateSession(session.copy(pokeActionsJson = ""))
         uiState.copy(pokeActionEditorVisible = false, pokeActionDrafts = emptyList()).setup()
         refreshUiState(sessionId)
+    }
+
+    /**
+     * 打开系统选图，挑一张当本会话的背景。
+     *
+     * 只取一张：背景是铺满整页的底图，多选没有意义。
+     */
+    @UiIntentObserver(ChatUiIntent.PickSessionBackground::class)
+    private suspend fun onPickSessionBackground() {
+        ChatViewEvent.PickBackgroundImage.tryEmit()
+    }
+
+    /** 选图回来，落库后立刻按新配置重建背景（不整页重载，避免滚动跳回顶部）。 */
+    @UiIntentObserver(ChatUiIntent.SessionBackgroundPicked::class)
+    private suspend fun onSessionBackgroundPicked(intent: ChatUiIntent.SessionBackgroundPicked) {
+        val sessionId = mSessionId ?: return
+        val stored = mPageBackgroundRepository.setImageFromUri(
+            page = PageBackgroundEntity.chatPage(sessionId),
+            uri = intent.uri
+        )
+        if (stored == null) {
+            AppViewEvent.PopupToastMessageByResId(R.string.image_prepare_failed).tryEmit()
+            return
+        }
+        refreshBackgroundOnly(sessionId, hasOwn = true)
+    }
+
+    /** 丢掉本会话的背景，回到跟全局一致。 */
+    @UiIntentObserver(ChatUiIntent.ClearSessionBackground::class)
+    private suspend fun onClearSessionBackground() {
+        val sessionId = mSessionId ?: return
+        mPageBackgroundRepository.clearImage(PageBackgroundEntity.chatPage(sessionId))
+        refreshBackgroundOnly(sessionId, hasOwn = false)
+    }
+
+    /** 只更新背景相关的两个字段，其它状态原样保留。 */
+    private suspend fun refreshBackgroundOnly(sessionId: Long, hasOwn: Boolean) {
+        val backgroundState = resolveBackgroundState(sessionId)
+        updateState { state ->
+            if (state is ChatUiState.Normal) {
+                state.copy(backgroundState = backgroundState, hasOwnBackground = hasOwn)
+            } else {
+                state
+            }
+        }
     }
 
     /**
@@ -1380,6 +1432,8 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         // 异步物理删除会话及关联数据
         withContext(Dispatchers.IO) {
             mChatRepository.deleteSession(sessionId)
+            // 会话没了，它专用的背景也没有主人了；不清会一直占着一张图
+            mPageBackgroundRepository.clearByPrefix(PageBackgroundEntity.chatPage(sessionId))
         }
         AppViewEvent.PopupToastMessageByResId(R.string.chat_deleted).tryEmit()
         // 关闭退出聊天页面
@@ -2806,31 +2860,37 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
     /**
      * 解析聊天页背景配置，返回可直接渲染的背景状态。
      *
-     * - 未配置背景图时返回仅含遮罩强度的空状态，页面继续使用主题纯色背景。
+     * 查找顺序是「会话自己设的 → 全局设置 → 纯色」：会话级背景的意义就是覆盖，
+     * 没设过才回落到全局那张，两者都没有就保持主题纯色。
+     *
      * - 图片 UUID 与缓存一致时直接复用已解码位图，避免每次刷新重复解码大图。
      * - 解码失败时同样缓存空位图结果，防止对损坏文件反复读取。
      *
+     * @param sessionId 当前单聊会话，用来拼会话级背景的页面键
      * @return 单聊页面背景展示状态
      */
-    private suspend fun resolveBackgroundState(): ChatBackgroundUiState {
-        val avatarUuid = AppModel.chatBackgroundImage
+    private suspend fun resolveBackgroundState(sessionId: Long): ChatBackgroundUiState {
         val dimPercent = AppModel.chatBackgroundDim
-        if (avatarUuid.isBlank()) return ChatBackgroundUiState(dimPercent = dimPercent)
+        val sessionUuid = runCatching {
+            mPageBackgroundRepository.imageUuid(PageBackgroundEntity.chatPage(sessionId))
+        }.getOrNull()
+        val imageUuid = sessionUuid ?: AppModel.chatBackgroundImage.takeIf { it.isNotBlank() }
+        if (imageUuid.isNullOrBlank()) return ChatBackgroundUiState(dimPercent = dimPercent)
         // 命中缓存时直接复用位图，仅刷新遮罩强度
         mBackgroundImageCache?.let { (cachedUuid, cachedImage) ->
-            if (cachedUuid == avatarUuid) {
+            if (cachedUuid == imageUuid) {
                 return ChatBackgroundUiState(image = cachedImage, dimPercent = dimPercent)
             }
         }
         // 未命中缓存时按屏幕量级采样解码，避免原图占满内存
         val image = withContext(Dispatchers.IO) {
             mFileRepository.loadSampledBitmap(
-                uuid = avatarUuid,
+                uuid = imageUuid,
                 requestedWidthPx = BACKGROUND_SAMPLE_WIDTH,
                 requestedHeightPx = BACKGROUND_SAMPLE_HEIGHT
             )?.asImageBitmap()
         }
-        mBackgroundImageCache = avatarUuid to image
+        mBackgroundImageCache = imageUuid to image
         return ChatBackgroundUiState(image = image, dimPercent = dimPercent)
     }
 
@@ -2922,7 +2982,11 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
             dialogState = dialogState,
             sessionPokeActions = sessionPokeActions,
             usesOwnPokeActions = session.pokeActionsJson.isNotBlank(),
-            backgroundState = resolveBackgroundState()
+            backgroundState = resolveBackgroundState(sessionId),
+            // 主键查一次很便宜，比让 resolveBackgroundState 返回复合结构更直观
+            hasOwnBackground = runCatching {
+                mPageBackgroundRepository.imageUuid(PageBackgroundEntity.chatPage(sessionId))
+            }.getOrNull() != null
         )
     }
 
@@ -3142,18 +3206,7 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         sessionId: Long,
         input: String,
         isEdit: Boolean = false
-    ): String {
-        val session = mChatRepository.getSessionById(sessionId) ?: return input
-        val character = mCharacterRepository.getCharacterById(session.characterId) ?: return input
-        val scripts = mRegexRepository.activeScripts(listOf(character))
-        val macros = RegexScriptRuntime.macros(
-            session.userName,
-            character.name,
-            session.userDescription,
-            character.scenario
-        )
-        return mRegexProcessor.applyUserInput(input, scripts, macros, isEdit)
-    }
+    ): String = mRegexApplier.forUserInput(sessionId, input, isEdit)
 
     /**
      * 在 AI 生成文本持久化前执行 Source 正则替换。
@@ -3167,21 +3220,7 @@ class ChatViewModel : CoreViewModelWithEvent<ChatUiIntent, ChatUiState>(
         sessionId: Long,
         input: String,
         isEdit: Boolean = false
-    ): String {
-        val session = mChatRepository.getSessionById(sessionId) ?: return input
-        val character = mCharacterRepository.getCharacterById(session.characterId) ?: return input
-        return mRegexProcessor.applyAiResponse(
-            input = input,
-            scripts = mRegexRepository.activeScripts(listOf(character)),
-            macros = RegexScriptRuntime.macros(
-                session.userName,
-                character.name,
-                session.userDescription,
-                character.scenario
-            ),
-            isEdit = isEdit
-        )
-    }
+    ): String = mRegexApplier.forAiResponse(sessionId, input, isEdit)
 
     /**
      * 根据生成的输出源类型分发应用用户正则或 AI 正则。

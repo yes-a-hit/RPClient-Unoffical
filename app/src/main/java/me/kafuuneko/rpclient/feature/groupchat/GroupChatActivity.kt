@@ -38,6 +38,16 @@ class GroupChatActivity : CoreActivityWithEvent() {
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris -> if (uris.isNotEmpty()) mViewModel.emit(GroupChatUiIntent.FilesPicked(uris)) }
 
+    /** 会话级背景只挑一张，走单选取图。 */
+    private val mBackgroundPicker = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { mViewModel.emit(GroupChatUiIntent.SessionBackgroundPicked(it)) } }
+
+    /** 场景背景同样是单张，但回填给正在编辑的场景草稿。 */
+    private val mSceneBackgroundPicker = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { mViewModel.emit(GroupChatUiIntent.SceneBackgroundPicked(it)) } }
+
 
     override fun getViewEventFlow() = mViewModel.viewEventFlow
 
@@ -77,6 +87,8 @@ class GroupChatActivity : CoreActivityWithEvent() {
             GroupChatViewEvent.PickImages ->
                 mImagePicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
             GroupChatViewEvent.OpenFilePicker -> mFilePicker.launch(arrayOf("*/*"))
+            GroupChatViewEvent.PickBackgroundImage -> mBackgroundPicker.launch("image/*")
+            GroupChatViewEvent.PickSceneBackgroundImage -> mSceneBackgroundPicker.launch("image/*")
             is GroupChatViewEvent.SaveImage -> mImageSaver.launch(viewEvent.metadata)
             is GroupChatViewEvent.CopyText -> copyText(viewEvent.text)
             else -> super.onReceivedViewEvent(viewEvent)

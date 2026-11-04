@@ -1,5 +1,4 @@
 package me.kafuuneko.rpclient.feature.tokenusage.ui
-
 import java.util.Locale
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -107,15 +106,6 @@ import me.kafuuneko.rpclient.ui.widgets.RpSectionHeader
 import me.kafuuneko.rpclient.ui.widgets.RpStackedRatioBar
 import me.kafuuneko.rpclient.ui.widgets.RpTrendChartCard
 
-/**
- * Token 消耗总览、时序图表、模型排行榜与近期请求明细的 Compose 布局入口。
- *
- * 视觉结构与调度机制：
- * - 顶部 Hero 仪表卡片集中展示消耗总量与分段比例。
- * - 趋势分析卡片复用应用级通用图表组件 RpTrendChartCard。
- * - 模型聚合区升级为带排名徽章与占比进度条的纵向排行榜。
- * - 明细列表采用三段式高信噪比设计，支持平滑展开底层技术调试元数据。
- */
 @Composable
 fun TokenUsageLayout(
     uiState: TokenUsageUiState,
@@ -133,8 +123,9 @@ fun TokenUsageLayout(
 }
 
 /** 组合页面导航和统计内容，统一控制空态与清空入口。 */
+
 @Composable
-private fun NormalView(
+internal fun NormalView(
     uiState: TokenUsageUiState.Normal,
     emit: TokenUsageUiIntent.() -> Unit
 ) {
@@ -165,8 +156,9 @@ private fun NormalView(
 }
 
 /** 按原顺序组织统计列表，保留各区块的惰性加载边界。 */
+
 @Composable
-private fun UsageContent(
+internal fun UsageContent(
     uiState: TokenUsageUiState.Normal,
     hasRecords: Boolean,
     paddingValues: PaddingValues,
@@ -241,782 +233,9 @@ private fun UsageContent(
 }
 
 /** 渲染趋势与选点提示，将图表操作转换为页面 Intent。 */
-@Composable
-private fun UsageTrendCard(
-    points: List<TokenUsageTrendPoint>,
-    selectedPointKey: String?,
-    chartMode: TokenUsageChartMode,
-    selectedPeriod: TokenUsagePeriod,
-    emit: TokenUsageUiIntent.() -> Unit
-) {
-    // 趋势点未变时复用图表数据；全零区间不显示峰值说明。
-    val chartPoints = remember(points) {
-        points.map { it.toChartDataPoint() }
-    }
-    val peakPoint = points.maxByOrNull { it.totalTokens }
-    val peakText = if (peakPoint != null && peakPoint.totalTokens > 0L) {
-        stringResource(
-            R.string.token_usage_peak_day,
-            peakPoint.label,
-            peakPoint.totalTokens.formatted()
-        )
-    } else null
-
-    RpTrendChartCard(
-        title = stringResource(R.string.token_usage_trend),
-        points = chartPoints,
-        selectedKey = selectedPointKey,
-        chartMode = when (chartMode) {
-            TokenUsageChartMode.Bar -> RpChartMode.Bar
-            TokenUsageChartMode.Line -> RpChartMode.Line
-        },
-        onSelectPoint = { key -> TokenUsageUiIntent.SelectTrendPoint(key).emit() },
-        onSelectChartMode = { mode ->
-            val target = when (mode) {
-                RpChartMode.Bar -> TokenUsageChartMode.Bar
-                RpChartMode.Line -> TokenUsageChartMode.Line
-            }
-            TokenUsageUiIntent.SelectChartMode(target).emit()
-        },
-        barLabel = stringResource(R.string.token_usage_chart_mode_bar),
-        lineLabel = stringResource(R.string.token_usage_chart_mode_line),
-        peakText = peakText,
-        autoScrollKey = selectedPeriod,
-        tooltipContent = { selectedDataPoint ->
-            val selectedPoint = points.firstOrNull { it.key == selectedDataPoint.key }
-            if (selectedPoint != null) {
-                TrendPointDetails(selectedPoint)
-            }
-        }
-    )
-}
-
-/** 展示当前选中日期的请求数与总量。 */
-@Composable
-private fun TrendPointDetails(selectedPoint: TokenUsageTrendPoint) {
-    // 仅展示传入日期，选中项不存在时由趋势卡片省略提示。
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.40f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "${selectedPoint.key} · ${stringResource(R.string.token_usage_request_count, selectedPoint.requestCount)}",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = "${stringResource(R.string.token_usage_total)} ${selectedPoint.totalTokens.formatted()}",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
-    }
-}
-
-/** 展示周期筛选并回传选择操作。 */
-@Composable
-private fun PeriodFilters(
-    selectedPeriod: TokenUsagePeriod,
-    emit: TokenUsageUiIntent.() -> Unit
-) {
-    // 小屏允许横向滚动，周期切换仍由页面 Intent 驱动。
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        TokenUsagePeriod.entries.forEach { period ->
-            FilterChip(
-                selected = period == selectedPeriod,
-                onClick = { TokenUsageUiIntent.SelectPeriod(period).emit() },
-                label = { Text(stringResource(period.titleRes())) }
-            )
-        }
-    }
-}
-
-/** 组合当前周期的总量、占比与细分指标。 */
-/**
- * 账户余额卡。
- *
- * 只展示服务商返回的真实余额：此前这里还有一块「按报价估算的金额」，
- * 但估算永远对不上账单，展示出来只会误导，已整块移除。
- */
-@Composable
-private fun BillingOverviewCard(
-    balance: TokenUsageBalanceState,
-    emit: TokenUsageUiIntent.() -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            0.5.dp,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            BillingHeader(
-                icon = Icons.Rounded.Savings,
-                title = stringResource(R.string.token_usage_balance_title),
-                onRefresh = { TokenUsageUiIntent.RefreshBalance.emit() },
-                refreshing = balance is TokenUsageBalanceState.Loading
-            )
-            Text(
-                text = balanceText(balance),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
-/** 计费分区标题行：图标 + 标题 + 右侧刷新按钮。 */
-@Composable
-private fun BillingHeader(
-    icon: ImageVector,
-    title: String,
-    onRefresh: () -> Unit,
-    refreshing: Boolean
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = title,
-            modifier = Modifier.padding(start = 8.dp),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        if (refreshing) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp
-            )
-        } else {
-            IconButton(onClick = onRefresh, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = stringResource(R.string.token_usage_refresh),
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-/** 余额说明；不支持与失败分别给出不同文案。 */
-@Composable
-private fun balanceText(balance: TokenUsageBalanceState): String = when (balance) {
-    TokenUsageBalanceState.Hidden -> stringResource(R.string.token_usage_balance_unknown)
-    TokenUsageBalanceState.Loading -> stringResource(R.string.token_usage_balance_loading)
-    is TokenUsageBalanceState.Available -> {
-        val amount = formatAmount(balance.remaining)
-        "${balance.providerName} · ${currencyPrefix(balance.currency)}$amount"
-    }
-
-    is TokenUsageBalanceState.Unsupported -> balance.reason
-    is TokenUsageBalanceState.Failed -> balance.reason
-}
-
-/** 余额金额格式化，统一两位小数。 */
-private fun formatAmount(value: Double): String = String.format(Locale.US, "%.2f", value)
-
-/** 币种前缀；无法识别时回退成币种代码。 */
-private fun currencyPrefix(currency: String): String = when (currency.uppercase()) {
-    "USD" -> "US$"
-    "CNY", "RMB" -> "¥"
-    else -> "$currency "
-}
 
 @Composable
-private fun HeroSummaryCard(summary: TokenUsageSummaryItem) {
-    // 分区组件直接沿用此处的间距，保持总览卡片布局稳定。
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            0.5.dp,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            SummaryHeader(summary)
-
-            SummaryRatio(summary)
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
-
-            SummaryMetrics(summary)
-        }
-    }
-}
-
-/** 展示总消耗及当前周期请求数。 */
-@Composable
-private fun SummaryHeader(summary: TokenUsageSummaryItem) {
-    // 总量与请求数共用同一份汇总快照，避免筛选切换时口径混用。
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = stringResource(R.string.token_usage_total),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = summary.totalTokens.formatted(),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.20f))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    Icons.Rounded.Schedule,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = stringResource(R.string.token_usage_request_count, summary.requestCount),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    }
-}
-
-/** 展示输入输出在总量中的比例。 */
-@Composable
-private fun SummaryRatio(summary: TokenUsageSummaryItem) {
-    // 无消耗时隐藏比例条，避免展示没有意义的占比。
-    if (summary.totalTokens > 0L) {
-        RpStackedRatioBar(
-            segments = listOf(
-                RpChartSegment(
-                    value = summary.inputTokens.toFloat(),
-                    color = TokenUsageInputColor,
-                    label = "${stringResource(R.string.token_usage_input)} ${(summary.inputRatio * 100).toInt()}%"
-                ),
-                RpChartSegment(
-                    value = summary.outputTokens.toFloat(),
-                    color = TokenUsageOutputColor,
-                    label = "${stringResource(R.string.token_usage_output)} ${(summary.outputRatio * 100).toInt()}%"
-                )
-            )
-        )
-    }
-}
-
-/** 展示输入输出及可用的缓存、推理细分指标。 */
-@Composable
-private fun SummaryMetrics(summary: TokenUsageSummaryItem) {
-    // 缓存和推理仅在有正值时补充展示，不作为额外消耗加入总量。
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        SummaryMetricCell(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Rounded.Storage,
-            title = stringResource(R.string.token_usage_input),
-            value = summary.inputTokens.formatted(),
-            accentColor = TokenUsageInputColor
-        )
-        SummaryMetricCell(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Rounded.Stream,
-            title = stringResource(R.string.token_usage_output),
-            value = summary.outputTokens.formatted(),
-            accentColor = TokenUsageOutputColor
-        )
-    }
-
-    if (summary.cachedInputTokens > 0L || summary.reasoningTokens > 0L) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            if (summary.cachedInputTokens > 0L) {
-                SummaryMetricCell(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Savings,
-                    title = stringResource(R.string.token_usage_cached_input, "").trim(),
-                    value = summary.cachedInputTokens.formatted(),
-                    accentColor = TokenUsageCachedColor
-                )
-            }
-            if (summary.reasoningTokens > 0L) {
-                SummaryMetricCell(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.AutoGraph,
-                    title = stringResource(R.string.token_usage_reasoning, "").trim(),
-                    value = summary.reasoningTokens.formatted(),
-                    accentColor = TokenUsageReasoningColor
-                )
-            }
-        }
-    }
-}
-
-/** 按统一样式展示带图标的统计指标。 */
-@Composable
-private fun SummaryMetricCell(
-    modifier: Modifier,
-    icon: ImageVector,
-    title: String,
-    value: String,
-    accentColor: Color
-) {
-    // 指标配色同时用于图标与边框，单行数值溢出时省略。
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
-        border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.18f))
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(accentColor.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(16.dp))
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-/** 展示单个模型分组的排名及消耗占比。 */
-@Composable
-private fun UsageGroupRankCard(index: Int, item: TokenUsageGroupItem) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            0.5.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(15.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            UsageGroupHeader(index, item)
-
-            // 极小占比保留最小可见宽度，右侧百分比仍显示实际值。
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(item.ratio.coerceIn(0.01f, 1.0f))
-                        .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-            }
-
-            UsageGroupMetrics(item)
-        }
-    }
-}
-
-/** 显示前三名专属配色的排名徽章。 */
-@Composable
-private fun RankBadge(index: Int) {
-    // 前三名使用独立配色，其余名次跟随当前主题。
-    val rankBadgeBg = when (index) {
-        1 -> RankGoldBadgeColor.copy(alpha = 0.18f)
-        2 -> RankSilverBadgeColor.copy(alpha = 0.22f)
-        3 -> RankBronzeBadgeColor.copy(alpha = 0.18f)
-        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-    }
-    val rankBadgeText = when (index) {
-        1 -> RankGoldTextColor
-        2 -> RankSilverTextColor
-        3 -> RankBronzeTextColor
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Surface(
-        modifier = Modifier.size(28.dp),
-        shape = CircleShape,
-        color = rankBadgeBg
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = index.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = rankBadgeText
-            )
-        }
-    }
-}
-
-/** 展示模型、服务端点及其消耗占比。 */
-@Composable
-private fun UsageGroupHeader(index: Int, item: TokenUsageGroupItem) {
-    // 模型名和端点保留单行省略，避免长名称挤占右侧总量。
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        RankBadge(index)
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.model,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = item.endpoint,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = item.totalTokens.formatted(),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "${(item.ratio * 100).toInt()}%",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-/** 展示同一模型分组的请求数与输入输出总量。 */
-@Composable
-private fun UsageGroupMetrics(item: TokenUsageGroupItem) {
-    // 分组口径由上层提供，此处不重新聚合请求记录。
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = stringResource(R.string.token_usage_request_count, item.requestCount),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "${stringResource(R.string.token_usage_input)} ${item.inputTokens.formatted()}",
-                style = MaterialTheme.typography.labelSmall,
-                color = TokenUsageInputColor
-            )
-            Text(
-                text = "${stringResource(R.string.token_usage_output)} ${item.outputTokens.formatted()}",
-                style = MaterialTheme.typography.labelSmall,
-                color = TokenUsageOutputColor
-            )
-        }
-    }
-}
-
-/** 展示单次请求摘要，并在点击后展开统计来源。 */
-@Composable
-private fun RecentRequestCard(item: TokenUsageRecordItem) {
-    // 展开状态属于当前请求卡片，外围列表以记录 ID 保持身份稳定。
-    var isExpanded by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { isExpanded = !isExpanded },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            0.5.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(15.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            RequestHeader(item)
-
-            RequestMetadata(item)
-
-            RequestTokenBreakdown(item, isExpanded)
-
-            // 沿用原来的展开与收起动画，详情不参与折叠态布局。
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = fadeIn(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                RequestDetails(item)
-            }
-        }
-    }
-}
-
-/** 展示请求模型、协议与总消耗。 */
-@Composable
-private fun RequestHeader(item: TokenUsageRecordItem) {
-    // 模型名可省略，协议和总量保持完整标签。
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = item.model,
-                modifier = Modifier.weight(1f, fill = false),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f)
-            ) {
-                Text(
-                    text = item.protocol.shortName(),
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    softWrap = false
-                )
-            }
-        }
-
-        Spacer(Modifier.width(8.dp))
-
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.20f))
-        ) {
-            Text(
-                text = "+${item.totalTokens.formatted()} Tk",
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                softWrap = false
-            )
-        }
-    }
-}
-
-/** 展示请求时间、耗时、模式及缓存用量。 */
-@Composable
-private fun RequestMetadata(item: TokenUsageRecordItem) {
-    // 缓存值缺失或为零时省略缓存提示。
-    val mode = stringResource(
-        if (item.isStreaming) R.string.token_usage_stream else R.string.token_usage_once
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(
-            text = item.createTimeText,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-        Text(text = "·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Icon(
-                Icons.Rounded.ElectricBolt,
-                contentDescription = null,
-                tint = TokenUsageLatencyColor,
-                modifier = Modifier.size(13.dp)
-            )
-            Text(
-                text = stringResource(R.string.token_usage_duration, item.durationMs),
-                style = MaterialTheme.typography.bodySmall,
-                color = TokenUsageLatencyColor,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1
-            )
-        }
-        Text(text = "·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
-        Text(
-            text = mode,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-        if (item.cachedInputTokens != null && item.cachedInputTokens > 0L) {
-            Text(text = "·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
-            Text(
-                text = "💾 ${item.cachedInputTokens.formatted()}",
-                style = MaterialTheme.typography.bodySmall,
-                color = TokenUsageCachedColor,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-/** 展示输入输出、可用推理用量及展开标识。 */
-@Composable
-private fun RequestTokenBreakdown(item: TokenUsageRecordItem, isExpanded: Boolean) {
-    // 推理用量作为细分信息显示，不在这里重复计入总量。
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = "${stringResource(R.string.token_usage_input)} ${item.inputTokens.formatted()}",
-                style = MaterialTheme.typography.labelSmall,
-                color = TokenUsageInputColor
-            )
-            Text(
-                text = "${stringResource(R.string.token_usage_output)} ${item.outputTokens.formatted()}",
-                style = MaterialTheme.typography.labelSmall,
-                color = TokenUsageOutputColor
-            )
-            if (item.reasoningTokens != null && item.reasoningTokens > 0L) {
-                Text(
-                    text = "🧠 ${item.reasoningTokens.formatted()}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TokenUsageReasoningColor
-                )
-            }
-        }
-
-        Icon(
-            imageVector = if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.50f),
-            modifier = Modifier.size(18.dp)
-        )
-    }
-}
-
-/** 展示服务端点及输入输出计数来源。 */
-@Composable
-private fun RequestDetails(item: TokenUsageRecordItem) {
-    // 输入与输出可能使用不同计数来源；分词器缺失时不显示名称行。
-    val inputSource = stringResource(item.inputSource.titleRes())
-    val outputSource = stringResource(item.outputSource.titleRes())
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f))
-        Text(
-            text = stringResource(R.string.token_usage_host, item.endpoint, item.providerName),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-        )
-        Text(
-            text = stringResource(R.string.token_usage_source_format, inputSource, outputSource),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-        )
-        if (!item.tokenizerName.isNullOrBlank()) {
-            Text(
-                text = stringResource(R.string.token_usage_tokenizer, item.tokenizerName),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-            )
-        }
-    }
-}
-
-/** 根据页面状态展示清空记录确认框。 */
-@Composable
-private fun DialogSwitch(
+internal fun DialogSwitch(
     dialogState: TokenUsageDialogState,
     emit: TokenUsageUiIntent.() -> Unit
 ) {
@@ -1034,7 +253,7 @@ private fun DialogSwitch(
     }
 }
 
-private fun TokenUsagePeriod.titleRes(): Int {
+internal fun TokenUsagePeriod.titleRes(): Int {
     return when (this) {
         TokenUsagePeriod.Today -> R.string.token_usage_today
         TokenUsagePeriod.LastSevenDays -> R.string.token_usage_last_7_days
@@ -1043,7 +262,7 @@ private fun TokenUsagePeriod.titleRes(): Int {
     }
 }
 
-private fun LLMTokenUsageSource.titleRes(): Int {
+internal fun LLMTokenUsageSource.titleRes(): Int {
     return when (this) {
         LLMTokenUsageSource.ProviderReported -> R.string.token_usage_reported
         LLMTokenUsageSource.ModelAwareEstimate -> R.string.token_usage_model_estimate
@@ -1051,7 +270,7 @@ private fun LLMTokenUsageSource.titleRes(): Int {
     }
 }
 
-private fun LLMProviderProtocol.shortName(): String {
+internal fun LLMProviderProtocol.shortName(): String {
     return when (this) {
         LLMProviderProtocol.OpenAICompatible -> "OpenAI"
         LLMProviderProtocol.Gemini -> "Gemini"
@@ -1059,7 +278,7 @@ private fun LLMProviderProtocol.shortName(): String {
     }
 }
 
-private fun Long.formatted(): String {
+internal fun Long.formatted(): String {
     if (this < 1_000L) {
         return this.toString()
     }
@@ -1072,7 +291,7 @@ private fun Long.formatted(): String {
     return "$formattedNumber$unit"
 }
 
-private fun TokenUsageTrendPoint.toChartDataPoint(): RpChartDataPoint {
+internal fun TokenUsageTrendPoint.toChartDataPoint(): RpChartDataPoint {
     return RpChartDataPoint(
         key = key,
         label = label,
@@ -1087,7 +306,7 @@ private fun TokenUsageTrendPoint.toChartDataPoint(): RpChartDataPoint {
 
 @Preview(widthDp = 390, heightDp = 844, showBackground = true)
 @Composable
-private fun TokenUsageLayoutPreview() {
+internal fun TokenUsageLayoutPreview() {
     // 固定主题与多种用量来源，便于检查总览、趋势和明细的组合布局。
     AppTheme(dynamicColor = false) {
         TokenUsageLayout(

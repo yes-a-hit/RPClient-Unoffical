@@ -21,3 +21,9 @@ gradle/gradle-daemon-jvm.properties
 
 # æ”¾å®˜æ–¹ APK çš„ä¸´æ—¶ç›®å½•ï¼Œä¸è¿›ä»“åº“
 /ä¸Šæ¸¸/
+
+# ±¾µØÈÎÎñ¸ú×ÙÆ÷£¨mattpocock/skills µÄ .scratch ¸ù£©£¬²»Èë¿â
+/.scratch/
+
+# ±¾µØ´úÂëÉó²é²İ¸å
+/docs/reviews/
