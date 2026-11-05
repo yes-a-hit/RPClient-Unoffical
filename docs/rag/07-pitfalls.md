@@ -175,8 +175,21 @@ Material3 里是 `ButtonDefaults.textButtonColors(...)`。项目里用过 `Icons
 3. 复查手段：`grep -n 'Text(\"' app/src/main/java/me/kafuuneko/rpclient/feature` ——命中的每一处都该有个理由（纯符号、调试信息）。
 4. 这一轮的实际案例：群聊场景提示带的四行（场景名 / 在场 / 世界书 / 悄悄走）全都是硬编码，从 v1.20 一直漏到 v1.24 才被发现，中间跨了四个版本没人注意。
 
+## 二十二、中文写进 `.ps1` 就执行，脚本自己先乱码
+
+**症状**：`powershell.exe -File xxx.ps1` 报一堆看不懂的解析错——`Unexpected token '杩欎竴鐗堬細'`、`The string is missing the terminator`、`Missing closing ')'`。脚本在编辑器里看着完全正常。
+
+**根因**：`write` 工具写出来的是 **UTF-8 无 BOM**，而 `powershell.exe -File` 对无 BOM 文件按系统 ANSI（这里 GBK）解码。中文变乱码之后引号和括号的配对关系跟着崩掉，报错位置离真正的错处很远。
+
+**处置**：
+
+1. `.ps1` **正文只写 ASCII**。要传的中文（发布说明、提交信息）单独放一个 UTF-8 的 `.json` / `.txt`，脚本里用 `[System.IO.File]::ReadAllBytes($path)` 读字节直接当 `-Body`，别让 PowerShell 去解析那段中文。
+2. 提交信息同理：写 `%TEMP%\msg.txt` 再 `git commit -F`，别用 here-string。
+3. 同一根因的另外两种表现：`Get-Content` 读 Kotlin 中文变乱码（改用 `read` 工具）、PowerShell 内联 `python -c` 里带中文或 `\d`（写 `.py` 文件再跑）。
+4. 判断标准：**这段文字要不要被另一个进程按自己的编码规则解析**。要，就别让它进 `.ps1`。
+
 ## 最后核对
 
-随 `v1.24` 核对（群聊场景改造轮）。新增条目请保持「症状 → 根因 → 处置」三段式，别只写一句「注意 XX」——那对下一次排查没有用。
+随 `v1.25` 核对（推送与发布链路轮）。新增条目请保持「症状 → 根因 → 处置」三段式，别只写一句「注意 XX」——那对下一次排查没有用。
 
 历史变更见 [CHANGELOG](../CHANGELOG.md)。
